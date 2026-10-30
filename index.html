@@ -686,6 +686,8 @@ let categories=['Супи и чорби','Месни ястия','Ястия н�
 const $=id=>document.getElementById(id);
 const read=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key));return v??fallback}catch{return fallback}};
 let customCategories=read('myrecipes_customcats_v1',[]); let recipes=read('myrecipes_v1',[]),meatNotes=read('mymeat_v1',[]),shopping=read('myshop_v1',[]),timerInterval=null,timerEnd=0,activeRecipe=null,selectedCategory=null;
+const normalizeRecordIds=(items,prefix)=>{if(!Array.isArray(items))return;const seen=new Set();items.forEach((item,index)=>{if(!item||typeof item!=='object'||Array.isArray(item))return;let id=String(item.id??'');if(!/^[A-Za-z0-9._:-]{1,100}$/.test(id)||seen.has(id)){id=prefix+'-'+Date.now().toString(36)+'-'+index.toString(36);while(seen.has(id))id+='x'}item.id=id;seen.add(id)})};
+normalizeRecordIds(recipes,'recipe');normalizeRecordIds(meatNotes,'note');normalizeRecordIds(shopping,'shop');
 if(!history.state?.rmpView)history.replaceState({rmpView:'home'},'',location.href);
 
 const cloneState=value=>JSON.parse(JSON.stringify(value));
@@ -1105,7 +1107,7 @@ function readBackupFile(onValid){
    if((d.meatNotes||[]).some(x=>!isRecord(x)||!safeId(x.id)))throw Error('invalid');
    if((d.shopping||[]).some(x=>!isRecord(x)||!safeId(x.id)||typeof x.text!=='string'))throw Error('invalid');
    if((d.customCategories||[]).some(c=>!isRecord(c)||typeof c.name!=='string'||!c.name.trim()||(c.description!==undefined&&typeof c.description!=='string')||(c.photo!==undefined&&typeof c.photo!=='string')||(c.photo&&!safeImageUrl(c.photo))))throw Error('invalid');
-   const ensureIds=(items,prefix)=>items.forEach((x,i)=>{if(x.id===undefined||x.id===null||x.id==='')x.id=prefix+'-'+Date.now().toString(36)+'-'+i.toString(36)});
+   const ensureIds=(items,prefix)=>items.forEach((x,i)=>{if(x.id===undefined||x.id===null||x.id==='')x.id=prefix+'-'+Date.now().toString(36)+'-'+i.toString(36);else x.id=String(x.id)});
    ensureIds(d.recipes,'recipe');ensureIds(d.meatNotes||[],'note');ensureIds(d.shopping||[],'shop');
    onValid(d);
   }catch(error){console.warn('Recipe Master Plus: невалиден архив',error);alert('Файлът не е валиден архив на Recipe Master Plus или съдържа неподдържани данни. Текущите ти данни не са променени.')}
