@@ -1098,7 +1098,7 @@ function readBackupFile(onValid){
   try{
    const d=JSON.parse(reader.result);
    const isRecord=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
-   const safeId=id=>id===undefined||id===null||(typeof id==='string'&&/^[A-Za-z0-9._:-]{1,100}$/.test(id))||(typeof id==='number'&&Number.isFinite(id));
+   const safeId=id=>id===undefined||id===null||id===''||(typeof id==='string'&&/^[A-Za-z0-9._:-]{1,100}$/.test(id))||(typeof id==='number'&&Number.isFinite(id));
    if(!isRecord(d)||!Array.isArray(d.recipes)||('meatNotes'in d&&!Array.isArray(d.meatNotes))||('shopping'in d&&!Array.isArray(d.shopping))||('customCategories'in d&&!Array.isArray(d.customCategories)))throw Error('invalid');
    if(d.recipes.some(r=>!isRecord(r)||typeof r.name!=='string'||!safeId(r.id)))throw Error('invalid');
    if((d.meatNotes||[]).some(x=>!isRecord(x)||!safeId(x.id)))throw Error('invalid');
