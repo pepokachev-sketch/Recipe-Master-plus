@@ -745,8 +745,9 @@ const categoryIcons={
 };
 // Миграция: пилешките рецепти се запазват и преминават към Месни ястия.
 let recipesMigrated=false;recipes.forEach(r=>{if(r.cat==='Пилешки ястия'){r.cat='Месни ястия';recipesMigrated=true}});
-if(recipesMigrated){try{localStorage.setItem('myrecipes_v1',JSON.stringify(recipes))}catch(error){console.warn('Recipe Master Plus: миграцията ще бъде повторена при следващо успешно запазване',error)}}
+if(recipesMigrated){try{localStorage.setItem('myrecipes_v1',JSON.stringify(recipes));lastCommittedState.recipes=cloneState(recipes)}catch(error){console.warn('Recipe Master Plus: миграцията ще бъде повторена при следващо успешно запазване',error)}}
 categories=[...categories,...customCategories.map(c=>c.name).filter(Boolean)];
+lastCommittedState.categories=[...categories];
 let previewRecipeId=null,previewTab='ingredients',previewServings=1,previewScaleMode='servings',previewBaseAmount='';
 function selectRecipePreview(id){
  const r=recipes.find(x=>x.id===id);if(!r)return;
