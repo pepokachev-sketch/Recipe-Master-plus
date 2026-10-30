@@ -688,7 +688,26 @@ const read=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key));re
 let customCategories=read('myrecipes_customcats_v1',[]); let recipes=read('myrecipes_v1',[]),meatNotes=read('mymeat_v1',[]),shopping=read('myshop_v1',[]),timerInterval=null,timerEnd=0,activeRecipe=null,selectedCategory=null;
 if(!history.state?.rmpView)history.replaceState({rmpView:'home'},'',location.href);
 
-function persist(){const keys=['myrecipes_v1','mymeat_v1','myshop_v1'];let previous;try{const values=[JSON.stringify(recipes),JSON.stringify(meatNotes),JSON.stringify(shopping)];previous=keys.map(k=>localStorage.getItem(k));keys.forEach((k,i)=>localStorage.setItem(k,values[i]));return true}catch(error){if(previous)keys.forEach((k,i)=>{try{if(previous[i]===null)localStorage.removeItem(k);else localStorage.setItem(k,previous[i])}catch(rollbackError){console.error('Recipe Master Plus: неуспешно възстановяване на предишните данни',rollbackError)}});console.error('Recipe Master Plus: грешка при запис на данните',error);alert('Неуспешно запазване. Възможно е локалното хранилище да е запълнено. Изтегли резервно копие и освободи място, преди да продължиш.');return false}}
+const cloneState=value=>JSON.parse(JSON.stringify(value));
+let lastCommittedState={recipes:cloneState(recipes),meatNotes:cloneState(meatNotes),shopping:cloneState(shopping),customCategories:cloneState(customCategories),categories:[...categories]};
+function persist(){
+ const keys=['myrecipes_v1','mymeat_v1','myshop_v1','myrecipes_customcats_v1'];
+ let previous=null;
+ try{
+  const values=[JSON.stringify(recipes),JSON.stringify(meatNotes),JSON.stringify(shopping),JSON.stringify(customCategories)];
+  previous=keys.map(k=>localStorage.getItem(k));
+  keys.forEach((k,i)=>localStorage.setItem(k,values[i]));
+  lastCommittedState={recipes:cloneState(recipes),meatNotes:cloneState(meatNotes),shopping:cloneState(shopping),customCategories:cloneState(customCategories),categories:[...categories]};
+  return true;
+ }catch(error){
+  if(previous)keys.forEach((k,i)=>{try{if(previous[i]===null)localStorage.removeItem(k);else localStorage.setItem(k,previous[i])}catch(rollbackError){console.error('Recipe Master Plus: неуспешно възстановяване на предишните данни',rollbackError)}});
+  recipes=cloneState(lastCommittedState.recipes);meatNotes=cloneState(lastCommittedState.meatNotes);shopping=cloneState(lastCommittedState.shopping);customCategories=cloneState(lastCommittedState.customCategories);categories=[...lastCommittedState.categories];
+  console.error('Recipe Master Plus: грешка при запис на данните',error);
+  try{if($('recipeCount'))renderRecipes();if($('meatList'))renderMeat();if($('shopList'))renderShop();if($('customCategoryList'))renderCustomCategoryList()}catch(renderError){console.error('Recipe Master Plus: грешка при възстановяване на интерфейса',renderError)}
+  alert('Неуспешно запазване. Промените бяха върнати към последното успешно състояние. Възможно е локалното хранилище да е запълнено. Изтегли резервно копие и освободи място, преди да продължиш.');
+  return false;
+ }
+}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function safeUrl(value){try{const u=new URL(value);return ['http:','https:'].includes(u.protocol)?u.href:''}catch{return ''}}
 function safeImageUrl(value){const s=String(value||'');if(/^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+=*$/i.test(s))return s;return safeUrl(s)}
@@ -762,7 +781,7 @@ function renderDesktopPreview(){
 function addRecipeToShopping(id){
  const r=recipes.find(x=>x.id===id);if(!r)return;
  ingredientLines(r.ing).forEach(text=>{if(!shopping.some(s=>s.text.trim().toLocaleLowerCase('bg')===text.toLocaleLowerCase('bg')))shopping.push({id:Date.now().toString()+Math.random(),text,done:false})});
- persist();renderShop();
+ if(!persist())return;renderShop();
 }
 
 function renderRecipes(){
@@ -875,7 +894,7 @@ $('editorScaleMode')?.addEventListener('change',e=>{editorCurrentMode=e.target.v
 $('editorScaleTarget')?.addEventListener('input',()=>{if($('editorScaleMode')?.value==='servings')$('rserv').value=$('editorScaleTarget').value;updateIngredientEditorPreview()});
 $('rserv')?.addEventListener('input',()=>{if($('editorScaleMode')?.value==='servings'){$('editorScaleTarget').value=$('rserv').value;updateIngredientEditorPreview()}});
 function ingredientLinesFromRows(rows){return normalizeIngredientRows(rows).map(x=>ingredientText(x,1)).filter(Boolean).join('\n')}
-function toggleFavorite(id){const r=recipes.find(x=>x.id===id);if(r){r.favorite=!r.favorite;persist();renderRecipes()}}
+function toggleFavorite(id){const r=recipes.find(x=>x.id===id);if(r){r.favorite=!r.favorite;if(!persist())return;renderRecipes()}}
 function ingredientLines(v){return String(v||'').split(/\n/).map(x=>x.trim()).filter(Boolean)}
 function scaleLine(line,factor){
  const m=line.match(/^(\s*)(\d+(?:[.,]\d+)?|\d+\/\d+)(?=\s|$)/);
@@ -943,7 +962,7 @@ async function findRecipePhoto(r,force=false){
   r.photoLicense=[chosen.license,chosen.license_version].filter(Boolean).join(' ').toUpperCase()||'Отворен лиценз';
   r.photoPage=chosen.foreign_landing_url||chosen.detail_url||'';
   r.photoSource=chosen.source||'Openverse';r.photoError=false;r.photoLoading=false;
-  persist();refreshRecipePhotoArea(r);
+  if(!persist())return;refreshRecipePhotoArea(r);
  }catch(error){
   if(requestId!==recipePhotoRequest||activeRecipe?.id!==r.id)return;
   r.photoLoading=false;r.photoError=true;refreshRecipePhotoArea(r);
@@ -1016,7 +1035,7 @@ window.addEventListener('popstate',e=>{
   renderRecipes();
  }
 });
-$('detailShop').onclick=()=>{if(!activeRecipe)return;const lines=recipeIngredientLines(activeRecipe);lines.forEach(text=>{if(!shopping.some(s=>s.text.trim().toLocaleLowerCase('bg')===text.toLocaleLowerCase('bg')))shopping.push({id:Date.now().toString()+Math.random(),text,done:false})});persist();renderShop();closeRecipeDetail();switchTab('shopping')};
+$('detailShop').onclick=()=>{if(!activeRecipe)return;const lines=recipeIngredientLines(activeRecipe);lines.forEach(text=>{if(!shopping.some(s=>s.text.trim().toLocaleLowerCase('bg')===text.toLocaleLowerCase('bg')))shopping.push({id:Date.now().toString()+Math.random(),text,done:false})});if(!persist())return;renderShop();closeRecipeDetail();switchTab('shopping')};
 let expandedTarget=null;
 function openExpandedEditor(fieldId){
  const field=$(fieldId);if(!field||!$('editId').value)return;
@@ -1062,19 +1081,57 @@ function fromGrams(g,u,i){let rho=density[i],tb=gramsPerTbsp[i];return u==='g'?g
 const unitNames={g:'г',kg:'кг',ml:'мл',tbsp:'с.л.',tsp:'ч.л.',cup:'чаени чаши',coffee:'кафени чашки',pinch:'щипки'};
 $('convert').onclick=()=>{let a=Number($('amount').value);if(!Number.isFinite(a)||a<0){$('convertResult').textContent='Въведи валидно неотрицателно количество.';return}let i=$('ingredient').value,g=toGrams(a,$('fromUnit').value,i),res=fromGrams(g,$('toUnit').value,i);$('convertResult').textContent=`${a} ${unitNames[$('fromUnit').value]} ≈ ${Number(res.toFixed(2))} ${unitNames[$('toUnit').value]} (ориентировъчно)`};
 $('scale').onclick=()=>{let a=Number($('oldServ').value),b=Number($('newServ').value);$('scaleResult').textContent=a>0&&b>0?`Коефициент: ${(b/a).toFixed(3).replace('.',',')}. Умножи всяко количество по този коефициент.`:'Въведи брой порции, по-голям от нула.'};
-$('saveMeat').onclick=()=>{let name=$('mname').value.trim();if(!name){alert('Въведи име на изделието.');return}meatNotes.unshift({id:Date.now().toString(),name,raw:$('mraw').value,diam:$('mdiam').value,salt:$('msalt').value,temp:$('mtemp').value,time:$('mtime').value,stage:$('mstage').value,notes:$('mnotes').value});persist();['mname','mraw','mdiam','msalt','mtemp','mtime','mnotes'].forEach(id=>$(id).value='');renderMeat()};
+$('saveMeat').onclick=()=>{let name=$('mname').value.trim();if(!name){alert('Въведи име на изделието.');return}meatNotes.unshift({id:Date.now().toString(),name,raw:$('mraw').value,diam:$('mdiam').value,salt:$('msalt').value,temp:$('mtemp').value,time:$('mtime').value,stage:$('mstage').value,notes:$('mnotes').value});if(!persist())return;['mname','mraw','mdiam','msalt','mtemp','mtime','mnotes'].forEach(id=>$(id).value='');renderMeat()};
 function renderMeat(){$('meatList').innerHTML=meatNotes.map(m=>`<article class="recipe" style="margin-top:12px"><h3>${esc(m.name)}</h3><span class="tag">${esc(m.stage)}</span><p class="small">${m.raw?'Суровини: '+esc(m.raw)+'<br>':''}${m.diam?'Диаметър: '+esc(m.diam)+' мм<br>':''}${m.salt?'Сол: '+esc(m.salt)+' г<br>':''}${m.temp?'Температура: '+esc(m.temp)+' °C<br>':''}${m.time?'Време: '+esc(m.time)+' ч<br>':''}${esc(m.notes)}</p><button class="btn small danger" onclick="deleteMeat('${esc(m.id)}')">Изтрий бележката</button></article>`).join('')}
-function deleteMeat(id){if(confirm('Да изтрия ли бележката?')){meatNotes=meatNotes.filter(m=>m.id!==id);persist();renderMeat()}}
+function deleteMeat(id){if(confirm('Да изтрия ли бележката?')){meatNotes=meatNotes.filter(m=>m.id!==id);if(!persist())return;renderMeat()}}
 function renderShop(){$('shopList').innerHTML=shopping.length?shopping.map(s=>`<div class="list-item ${s.done?'done':''}"><input type="checkbox" ${s.done?'checked':''} onchange="toggleShop('${esc(s.id)}')"><span class="item-text">${esc(s.text)}</span><button class="btn small ghost" onclick="deleteShop('${esc(s.id)}')">Премахни</button></div>`).join(''):'<div class="empty" style="margin-top:12px">Списъкът е празен.</div>'}
-$('addShop').onclick=()=>{let v=$('shopInput').value.trim();if(v){shopping.push({id:Date.now().toString(),text:v,done:false});$('shopInput').value='';persist();renderShop()}};$('shopInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('addShop').click()});
-function toggleShop(id){shopping=shopping.map(s=>s.id===id?{...s,done:!s.done}:s);persist();renderShop()}function deleteShop(id){shopping=shopping.filter(s=>s.id!==id);persist();renderShop()}
-$('clearDone').onclick=()=>{shopping=shopping.filter(s=>!s.done);persist();renderShop()};
-$('clearShop').onclick=()=>{if(confirm('Да изчистя ли целия списък?')){shopping=[];persist();renderShop()}};
+$('addShop').onclick=()=>{let v=$('shopInput').value.trim();if(v){shopping.push({id:Date.now().toString(),text:v,done:false});if(!persist())return;$('shopInput').value='';renderShop()}};$('shopInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('addShop').click()});
+function toggleShop(id){shopping=shopping.map(s=>s.id===id?{...s,done:!s.done}:s);if(!persist())return;renderShop()}function deleteShop(id){shopping=shopping.filter(s=>s.id!==id);if(!persist())return;renderShop()}
+$('clearDone').onclick=()=>{shopping=shopping.filter(s=>!s.done);if(!persist())return;renderShop()};
+$('clearShop').onclick=()=>{if(confirm('Да изчистя ли целия списък?')){shopping=[];if(!persist())return;renderShop()}};
 function downloadBackup(){const payload={app:'Recipe Master Plus',version:4,schemaVersion:2,recipes,meatNotes,shopping,customCategories,exportedAt:new Date().toISOString()};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='recipe-master-plus-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 $('exportData').onclick=downloadBackup;
-function readBackupFile(onValid){const f=$('importFile').files[0];if(!f){alert('Първо избери JSON архив.');return}const reader=new FileReader();reader.onload=()=>{try{const d=JSON.parse(reader.result);if(!d||!Array.isArray(d.recipes)||('meatNotes'in d&&!Array.isArray(d.meatNotes))||('shopping'in d&&!Array.isArray(d.shopping)))throw Error('invalid');if(d.recipes.some(r=>!r||typeof r!=='object'||typeof r.name!=='string'))throw Error('invalid');onValid(d)}catch{alert('Файлът не е валиден архив на Recipe Master Plus или съдържа неподдържани данни.')}};reader.onerror=()=>alert('Файлът не може да бъде прочетен.');reader.readAsText(f)}
-$('importData').onclick=()=>readBackupFile(d=>{if(!confirm(`Ще замениш ${recipes.length} рецепти, ${meatNotes.length} технологични бележки и ${shopping.length} продукта с данните от архива. Препоръчително е първо да изтеглиш резервно копие. Продължаваме ли?`))return;recipes=d.recipes;meatNotes=d.meatNotes||[];shopping=d.shopping||[];customCategories=Array.isArray(d.customCategories)?d.customCategories:[];categories=[...categories.filter(c=>!customCategories.some(x=>x.name===c)),...customCategories.map(x=>x.name)];recipes.forEach(r=>{if(r.cat==='Пилешки ястия')r.cat='Месни ястия'});saveCustomCats();refreshCategoryOptions();persist();renderRecipes();renderCustomCategoryList();renderMeat();renderShop();alert('Данните са възстановени успешно.')});
-$('mergeData').onclick=()=>readBackupFile(d=>{const keyRecipe=r=>String(r.id||'').trim()||`${String(r.name||'').trim().toLocaleLowerCase('bg')}|${String(r.cat||'').trim().toLocaleLowerCase('bg')}`;const keyGeneric=x=>String(x.id||'').trim()||JSON.stringify(x);const merge=(current,incoming,key)=>{const seen=new Set(current.map(key));let added=0;incoming.forEach(x=>{const k=key(x);if(!seen.has(k)){current.push(x);seen.add(k);added++}});return added};const nr=merge(recipes,d.recipes,keyRecipe),nm=merge(meatNotes,d.meatNotes||[],keyGeneric),ns=merge(shopping,d.shopping||[],x=>String(x.text||'').trim().toLocaleLowerCase('bg'));if(Array.isArray(d.customCategories)){const known=new Set(customCategories.map(x=>x.name));d.customCategories.forEach(c=>{if(c&&c.name&&!known.has(c.name)){customCategories.push(c);categories.push(c.name);known.add(c.name)}});saveCustomCats();refreshCategoryOptions()}persist();renderRecipes();renderCustomCategoryList();renderMeat();renderShop();alert(`Обединяването завърши. Добавени: ${nr} рецепти, ${nm} бележки и ${ns} продукта. Съществуващите дубликати са пропуснати.`)});
+function readBackupFile(onValid){
+ const f=$('importFile').files[0];if(!f){alert('Първо избери JSON архив.');return}
+ const reader=new FileReader();
+ reader.onload=()=>{
+  try{
+   const d=JSON.parse(reader.result);
+   const isRecord=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
+   const safeId=id=>id===undefined||id===null||(typeof id==='string'&&/^[A-Za-z0-9._:-]{1,100}$/.test(id))||(typeof id==='number'&&Number.isFinite(id));
+   if(!isRecord(d)||!Array.isArray(d.recipes)||('meatNotes'in d&&!Array.isArray(d.meatNotes))||('shopping'in d&&!Array.isArray(d.shopping))||('customCategories'in d&&!Array.isArray(d.customCategories)))throw Error('invalid');
+   if(d.recipes.some(r=>!isRecord(r)||typeof r.name!=='string'||!safeId(r.id)))throw Error('invalid');
+   if((d.meatNotes||[]).some(x=>!isRecord(x)||!safeId(x.id)))throw Error('invalid');
+   if((d.shopping||[]).some(x=>!isRecord(x)||!safeId(x.id)||typeof x.text!=='string'))throw Error('invalid');
+   if((d.customCategories||[]).some(c=>!isRecord(c)||typeof c.name!=='string'||!c.name.trim()||(c.description!==undefined&&typeof c.description!=='string')||(c.photo!==undefined&&typeof c.photo!=='string')||(c.photo&&!safeImageUrl(c.photo))))throw Error('invalid');
+   const ensureIds=(items,prefix)=>items.forEach((x,i)=>{if(x.id===undefined||x.id===null||x.id==='')x.id=prefix+'-'+Date.now().toString(36)+'-'+i.toString(36)});
+   ensureIds(d.recipes,'recipe');ensureIds(d.meatNotes||[],'note');ensureIds(d.shopping||[],'shop');
+   onValid(d);
+  }catch(error){console.warn('Recipe Master Plus: невалиден архив',error);alert('Файлът не е валиден архив на Recipe Master Plus или съдържа неподдържани данни. Текущите ти данни не са променени.')}
+ };
+ reader.onerror=()=>alert('Файлът не може да бъде прочетен.');
+ reader.readAsText(f);
+}
+$('importData').onclick=()=>readBackupFile(d=>{
+ if(!confirm(`Ще замениш ${recipes.length} рецепти, ${meatNotes.length} технологични бележки и ${shopping.length} продукта с данните от архива. Препоръчително е първо да изтеглиш резервно копие. Продължаваме ли?`))return;
+ const oldCategories=[...categories];
+ recipes=d.recipes;meatNotes=d.meatNotes||[];shopping=d.shopping||[];customCategories=d.customCategories||[];
+ categories=[...categories.filter(c=>!lastCommittedState.customCategories.some(x=>x.name===c)),...customCategories.map(x=>x.name)];
+ recipes.forEach(r=>{if(r.cat==='Пилешки ястия')r.cat='Месни ястия'});
+ if(!persist()){categories=oldCategories;return}
+ refreshCategoryOptions();renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
+ alert('Данните са възстановени успешно.');
+});
+$('mergeData').onclick=()=>readBackupFile(d=>{
+ const keyRecipe=r=>String(r.id||'').trim()||`${String(r.name||'').trim().toLocaleLowerCase('bg')}|${String(r.cat||'').trim().toLocaleLowerCase('bg')}`;
+ const keyGeneric=x=>String(x.id||'').trim()||JSON.stringify(x);
+ const merge=(current,incoming,key)=>{const seen=new Set(current.map(key));let added=0;incoming.forEach(x=>{const k=key(x);if(!seen.has(k)){current.push(x);seen.add(k);added++}});return added};
+ const nr=merge(recipes,d.recipes,keyRecipe),nm=merge(meatNotes,d.meatNotes||[],keyGeneric),ns=merge(shopping,d.shopping||[],x=>String(x.text||'').trim().toLocaleLowerCase('bg'));
+ if(Array.isArray(d.customCategories)){const known=new Set(customCategories.map(x=>x.name));d.customCategories.forEach(c=>{if(c&&!known.has(c.name)){customCategories.push(c);categories.push(c.name);known.add(c.name)}})}
+ if(!persist())return;
+ refreshCategoryOptions();renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
+ alert(`Обединяването завърши. Добавени: ${nr} рецепти, ${nm} бележки и ${ns} продукта. Съществуващите дубликати са пропуснати.`);
+});
 let tfInterval=null,tfEnd=0,tfRemaining=0,tfRunning=false,tfAlarmInterval=null,tfAudio=null;
 const tf=$('floatingTimer');
 function tfFmt(ms){const n=Math.max(0,Math.ceil(ms/1000));return `${String(Math.floor(n/3600)).padStart(2,'0')}:${String(Math.floor(n%3600/60)).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`}
@@ -1132,7 +1189,7 @@ updateWakeLockButton();
 if(keepScreenAwake&&document.visibilityState==='visible')requestScreenWakeLock(false);
 // Управление на собствени категории и снимки.
 function refreshCategoryOptions(){const sel=$('rcat');const val=sel.value;sel.innerHTML='';categories.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)});if(categories.includes(val))sel.value=val}
-function saveCustomCats(){try{localStorage.setItem('myrecipes_customcats_v1',JSON.stringify(customCategories));return true}catch(error){console.error('Recipe Master Plus: грешка при запис на категориите',error);alert('Категориите не бяха запазени. Възможно е локалното хранилище да е запълнено. Изтегли резервно копие и опитай отново.');return false}}
+function saveCustomCats(){return persist()}
 function renderCustomCategoryList(){const box=$('customCategoryList');if(!box)return;box.innerHTML=customCategories.length?customCategories.map((c,i)=>`<div class="custom-category-row"><div class="grow"><strong>${esc(c.name)}</strong><div class="small">${esc(c.description||'Без описание')} · ${recipes.filter(r=>r.cat===c.name).length} рецепти</div></div><div class="category-order-actions"><button class="btn ghost small" type="button" data-move-cat="${i}" data-dir="-1" ${i===0?'disabled':''} aria-label="Премести нагоре">↑</button><button class="btn ghost small" type="button" data-move-cat="${i}" data-dir="1" ${i===customCategories.length-1?'disabled':''} aria-label="Премести надолу">↓</button></div></div>`).join(''):'<p class="sub">Все още нямаш собствени категории.</p>'; }
 let categoryDraftPhoto='';
 function showCategoryPhoto(src){const box=$('categoryPhotoPreview');box.innerHTML=src?`<img src="${src}" alt="Преглед на снимката">`:'<span>🖼️</span><small>Предварителен преглед</small>';}
@@ -1142,9 +1199,9 @@ $('addCategoryBtn').onclick=()=>openCategoryEditor();
 if($('categoryCancel'))$('categoryCancel').onclick=closeCategoryEditor;if($('categoryCancelTop'))if($('categoryCancelTop'))$('categoryCancelTop').onclick=closeCategoryEditor;
 $('categoryPhotoRemove').onclick=()=>{categoryDraftPhoto='';$('categoryPhotoFile').value='';showCategoryPhoto('')};
 $('categoryPhotoFile').onchange=()=>{const f=$('categoryPhotoFile').files[0];if(!f)return;if(!f.type.startsWith('image/')){alert('Избери валиден файл с изображение.');$('categoryPhotoFile').value='';return}if(f.size>5*1024*1024){alert('Изображението трябва да е до 5 MB.');$('categoryPhotoFile').value='';return}const rd=new FileReader();rd.onerror=()=>{alert('Снимката не може да бъде прочетена.');$('categoryPhotoFile').value=''};rd.onload=()=>{const img=new Image();img.onerror=()=>{alert('Файлът не съдържа валидно изображение.');$('categoryPhotoFile').value=''};img.onload=()=>{const max=1200,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale)),canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d');if(!ctx){alert('Не може да се обработи изображението на това устройство.');return}ctx.drawImage(img,0,0,w,h);let compressed=canvas.toDataURL('image/webp',0.8);if(!compressed.startsWith('data:image/webp'))compressed=canvas.toDataURL('image/jpeg',0.78);if(compressed.length>2*1024*1024){alert('Снимката остава твърде голяма след компресиране. Избери по-малко изображение.');$('categoryPhotoFile').value='';return}categoryDraftPhoto=compressed;showCategoryPhoto(categoryDraftPhoto)};img.src=rd.result};rd.readAsDataURL(f)};
-$('categorySave').onclick=()=>{const oldName=$('categoryOldName').value||null,old=customCategories.find(c=>c.name===oldName),name=$('categoryName').value.trim(),description=$('categoryDescription').value.trim();if(!name){$('categoryFormMessage').textContent='Въведи име на категория.';$('categoryName').focus();return}if(categories.some(c=>c.toLocaleLowerCase('bg')===name.toLocaleLowerCase('bg'))&&name!==oldName){$('categoryFormMessage').textContent='Вече съществува категория с това име.';return}if(old){old.name=name;old.description=description;old.photo=categoryDraftPhoto;categories=categories.map(x=>x===oldName?name:x);recipes.forEach(r=>{if(r.cat===oldName)r.cat=name});if(selectedCategory===oldName)selectedCategory=name}else{customCategories.push({name,description,photo:categoryDraftPhoto,created:Date.now()});if(!categories.includes(name))categories.push(name)}if(!saveCustomCats())return;if(!persist())return;refreshCategoryOptions();renderRecipes();renderCustomCategoryList();closeCategoryEditor()};
+$('categorySave').onclick=()=>{const oldName=$('categoryOldName').value||null,old=customCategories.find(c=>c.name===oldName),name=$('categoryName').value.trim(),description=$('categoryDescription').value.trim();if(!name){$('categoryFormMessage').textContent='Въведи име на категория.';$('categoryName').focus();return}if(categories.some(c=>c.toLocaleLowerCase('bg')===name.toLocaleLowerCase('bg'))&&name!==oldName){$('categoryFormMessage').textContent='Вече съществува категория с това име.';return}if(old){old.name=name;old.description=description;old.photo=categoryDraftPhoto;categories=categories.map(x=>x===oldName?name:x);recipes.forEach(r=>{if(r.cat===oldName)r.cat=name});if(selectedCategory===oldName)selectedCategory=name}else{customCategories.push({name,description,photo:categoryDraftPhoto,created:Date.now()});if(!categories.includes(name))categories.push(name)}if(!persist())return;refreshCategoryOptions();renderRecipes();renderCustomCategoryList();closeCategoryEditor()};
 function deleteCustomCategory(name){const count=recipes.filter(r=>r.cat===name).length,choices=categories.filter(c=>c!==name);if(!choices.length){alert('Няма друга категория, в която да преместиш рецептите.');return}let target=null;if(count){const numbered=choices.map((c,i)=>`${i+1}. ${c}`).join('\n');const answer=prompt(`Категория „${name}“ съдържа ${count} рецепти.\nВъведи номера на категорията, в която да ги преместиш:\n${numbered}`,'1');if(answer===null)return;const index=Number(answer)-1;if(!Number.isInteger(index)||index<0||index>=choices.length){alert('Изборът не е валиден. Категорията не е изтрита.');return}target=choices[index]}if(!confirm(count?`Сигурен ли си, че искаш да изтриеш „${name}“ и да преместиш ${count} рецепти в „${target}“?`:`Сигурен ли си, че искаш да изтриеш категория „${name}“?`))return;if(count)recipes.forEach(r=>{if(r.cat===name)r.cat=target});customCategories=customCategories.filter(c=>c.name!==name);categories=categories.filter(c=>c!==name);if(!saveCustomCats())return;if(!persist())return;refreshCategoryOptions();selectedCategory=null;renderRecipes();renderCustomCategoryList()}
-$('customCategoryList').addEventListener('click',e=>{const move=e.target.closest('[data-move-cat]');if(!move)return;const i=Number(move.dataset.moveCat),j=i+Number(move.dataset.dir);if(j>=0&&j<customCategories.length){[customCategories[i],customCategories[j]]=[customCategories[j],customCategories[i]];const customNames=new Set(customCategories.map(c=>c.name));categories=[...categories.filter(c=>!customNames.has(c)),...customCategories.map(c=>c.name)];if(!saveCustomCats())return;renderCustomCategoryList();renderRecipes()}});
+$('customCategoryList').addEventListener('click',e=>{const move=e.target.closest('[data-move-cat]');if(!move)return;const i=Number(move.dataset.moveCat),j=i+Number(move.dataset.dir);if(j>=0&&j<customCategories.length){[customCategories[i],customCategories[j]]=[customCategories[j],customCategories[i]];const customNames=new Set(customCategories.map(c=>c.name));categories=[...categories.filter(c=>!customNames.has(c)),...customCategories.map(c=>c.name)];if(!persist())return;renderCustomCategoryList();renderRecipes()}});
 $('categoryMenuToggle').onclick=()=>{const menu=$('categoryActionMenu'),opening=menu.hidden;menu.hidden=!opening;$('categoryMenuToggle').setAttribute('aria-expanded',String(opening))};
 $('editOpenedCategory').onclick=()=>{const name=selectedCategory;$('categoryActionMenu').hidden=true;if(customCategories.some(c=>c.name===name))openCategoryEditor(name)};
 $('deleteOpenedCategory').onclick=()=>{const name=selectedCategory;$('categoryActionMenu').hidden=true;if(customCategories.some(c=>c.name===name))deleteCustomCategory(name)};
