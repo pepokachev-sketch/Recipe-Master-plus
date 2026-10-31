@@ -684,7 +684,21 @@ body{padding-bottom:76px}
 <script>
 let categories=['Супи и чорби','Месни ястия','Ястия на фурна','Салати и предястия','Десерти','Зимнина и консервиране','Домашни колбаси и мезета','Сосове и маринати','Тестени изделия','Рецепти от механи и ресторанти','Други'];
 const $=id=>document.getElementById(id);
-const read=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key));return v??fallback}catch{return fallback}};
+const storageReadErrors=[];
+const read=(key,fallback)=>{
+ let raw=null;
+ try{
+  raw=localStorage.getItem(key);
+  if(raw===null)return fallback;
+  const value=JSON.parse(raw);
+  if(!Array.isArray(value))throw new Error('invalid-storage-root');
+  return value;
+ }catch(error){
+  storageReadErrors.push({key,raw,error:String(error)});
+  console.error('Recipe Master Plus: локалните данни не могат да бъдат прочетени; оригиналното съдържание е запазено',key,error);
+  return fallback;
+ }
+};
 let customCategories=read('myrecipes_customcats_v1',[]); let recipes=read('myrecipes_v1',[]),meatNotes=read('mymeat_v1',[]),shopping=read('myshop_v1',[]),timerInterval=null,timerEnd=0,activeRecipe=null,selectedCategory=null;
 const normalizeRecordIds=(items,prefix)=>{if(!Array.isArray(items))return;const seen=new Set();items.forEach((item,index)=>{if(!item||typeof item!=='object'||Array.isArray(item))return;let id=String(item.id??'');if(!/^[A-Za-z0-9._:-]{1,100}$/.test(id)||seen.has(id)){id=prefix+'-'+Date.now().toString(36)+'-'+index.toString(36);while(seen.has(id))id+='x'}item.id=id;seen.add(id)})};
 normalizeRecordIds(recipes,'recipe');normalizeRecordIds(meatNotes,'note');normalizeRecordIds(shopping,'shop');
@@ -693,6 +707,11 @@ if(!history.state?.rmpView)history.replaceState({rmpView:'home'},'',location.hre
 const cloneState=value=>JSON.parse(JSON.stringify(value));
 let lastCommittedState={recipes:cloneState(recipes),meatNotes:cloneState(meatNotes),shopping:cloneState(shopping),customCategories:cloneState(customCategories),categories:[...categories]};
 function persist(){
+ if(storageReadErrors.length){
+  const keys=storageReadErrors.map(item=>item.key).join(', ');
+  alert('Открити са повредени или недостъпни локални данни ('+keys+'). Записването е блокирано, за да не бъдат презаписани. Не изчиствай данните на браузъра. Възстанови ги от резервно копие или потърси помощ за възстановяване.');
+  return false;
+ }
  const keys=['myrecipes_v1','mymeat_v1','myshop_v1','myrecipes_customcats_v1'];
  let previous=null;
  try{
