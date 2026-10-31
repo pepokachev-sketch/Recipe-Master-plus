@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+<title id="title">Odin wolf</title>
+<defs><linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffbd42"/><stop offset="1" stop-color="#ff7900"/></linearGradient><linearGradient id="fur" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#aeb4bd"/></linearGradient></defs>
+<path d="M24 91A49 49 0 1 1 103 25" fill="none" stroke="url(#ring)" stroke-width="8" stroke-linecap="round"/>
+<path d="M28 103 39 77 35 47 57 61 75 43 92 15 98 51 116 65 99 76 91 105 75 91 60 116 51 91Z" fill="url(#fur)" stroke="#f5f6f8" stroke-width="2" stroke-linejoin="round"/>
+<path d="m40 50 17 11-13 2Z" fill="#15171b"/><path d="m77 47 14-19 2 24-10 12Z" fill="#252a32"/>
+<path d="M61 70q12-12 25-8-8 12-25 8Z" fill="#11151c"/><path d="M66 67q8-7 15-5-7 7-15 5Z" fill="#22aaff"/>
+<path d="m99 75 14-10-7 17-13 8Z" fill="#fff"/><path d="m52 91 9 25 10-22-8 8Z" fill="#8f969f"/>
+</svg>
