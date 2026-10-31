@@ -82,7 +82,7 @@ test('migrates all four legacy collections atomically and keeps LocalStorage int
     myrecipes_v1: JSON.stringify([{ id: 'r1', name: 'Soup' }]),
     mymeat_v1: JSON.stringify([{ id: 'm1' }]),
     myshop_v1: JSON.stringify([{ id: 's1' }]),
-    myrecipes_customcats_v1: JSON.stringify([{ id: 'c1' }])
+    myrecipes_customcats_v1: JSON.stringify([{ name: 'Dinner' }])
   });
   const before = legacy.snapshot();
   const manager = new RecipeMasterDataManager({ indexedDB, dbName: 'rmp-migration-' + crypto.randomUUID() });
