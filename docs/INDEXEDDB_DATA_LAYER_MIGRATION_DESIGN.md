@@ -188,3 +188,32 @@ The adapter uses injected image-store and state-commit functions. This allows de
 - Restore with no images.
 
 The CI command now runs both the Data Manager and backup image adapter test files. Passing unit tests do not replace Android Chrome browser tests or integration of this adapter into the actual export/restore UI. **Data Manager activation remains blocked.**
+
+
+## 12. Backup adapter integration in the application (2026-10-31)
+
+The isolated backup image adapter is now connected to the actual JSON backup UI in `index.html` on the work branch:
+
+- Export calls `serializeBackupImages()` on cloned recipe/category data and uses the existing `rmpImageGet()` as the image reader. The live application state is not mutated.
+- Replace-import calls `restoreBackupImages()`. It writes each image through the existing `rmpImagePut()`, reads it back through `rmpImageGet()`, and only then invokes the state commit callback.
+- Merge-import uses the same staging and verification process before merging incoming records.
+- If LocalStorage persistence fails, the commit callback throws so the adapter does not report success. The existing `persist()` rollback restores the previous in-memory state.
+- Device-local `idb:` pointers are rejected in imported portable JSON. Current JSON export emits actual image data URLs.
+- The adapter is loaded lazily when an export/import action is invoked, avoiding an unused rejected dynamic-import promise during startup.
+- The service worker precaches `src/backup-image-adapter.js` so the feature remains available offline after the app shell is first installed/updated.
+
+### New integration smoke checks
+
+The CI suite now also:
+- Parses the actual first inline application script from `index.html` with Node's JavaScript parser.
+- Checks that the service worker precaches the backup adapter module.
+
+This is still not a real Android Chrome end-to-end test. The smoke test checks JavaScript syntax, not DOM behavior, IndexedDB transaction semantics, FileReader, quota behavior, or browser download/import UI. Those require a real browser test before merging to `main`.
+
+### Remaining release gates
+
+1. Run the updated GitHub Actions suite and verify every test result.
+2. Test JSON export with both Blob-backed and legacy IndexedDB image records in Android Chrome.
+3. Test replace-import and merge-import with multiple images, duplicate image data, missing/corrupt image records, and LocalStorage quota/persistence failure.
+4. Verify offline export/import after the service worker has installed the updated shell.
+5. Only after those checks, consider merging the work branch. Do not activate the separate Data Manager migration as part of this change.
