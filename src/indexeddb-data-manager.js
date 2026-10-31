@@ -1,0 +1,239 @@
+/**
+ * Recipe Master Plus — isolated IndexedDB state manager.
+ *
+ * NOT WIRED INTO index.html. This module is a preparation artifact only.
+ * Core application state and image blobs intentionally remain separate.
+ */
+const DEFAULT_DB_NAME = 'recipe-master-plus-data';
+const DEFAULT_DB_VERSION = 1;
+const COLLECTIONS = Object.freeze([
+  'recipes',
+  'meatNotes',
+  'shopping',
+  'customCategories'
+]);
+const LEGACY_KEYS = Object.freeze({
+  recipes: 'myrecipes_v1',
+  meatNotes: 'mymeat_v1',
+  shopping: 'myshop_v1',
+  customCategories: 'myrecipes_customcats_v1'
+});
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function validateCollection(name, value) {
+  if (!Array.isArray(value)) {
+    throw new TypeError('invalid-collection:' + name);
+  }
+  const ids = new Set();
+  value.forEach((record, index) => {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) {
+      throw new TypeError('invalid-record:' + name + ':' + index);
+    }
+    if (record.id === undefined || record.id === null || String(record.id).trim() === '') {
+      throw new TypeError('missing-record-id:' + name + ':' + index);
+    }
+    const id = String(record.id);
+    if (ids.has(id)) throw new TypeError('duplicate-record-id:' + name + ':' + id);
+    ids.add(id);
+  });
+  return value;
+}
+
+export function validateState(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new TypeError('invalid-state');
+  }
+  const state = {};
+  COLLECTIONS.forEach(name => {
+    state[name] = clone(validateCollection(name, input[name]));
+  });
+  return state;
+}
+
+export function parseLegacyState(storage) {
+  if (!storage || typeof storage.getItem !== 'function') {
+    throw new TypeError('legacy-storage-unavailable');
+  }
+  const state = {};
+  COLLECTIONS.forEach(name => {
+    const raw = storage.getItem(LEGACY_KEYS[name]);
+    if (raw === null) {
+      state[name] = [];
+      return;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      throw new Error('legacy-json-invalid:' + LEGACY_KEYS[name], { cause: error });
+    }
+    state[name] = parsed;
+  });
+  return validateState(state);
+}
+
+function requestResult(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('indexeddb-request-failed'));
+  });
+}
+
+function transactionDone(transaction) {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onabort = () => reject(transaction.error || new Error('indexeddb-transaction-aborted'));
+    transaction.onerror = () => reject(transaction.error || new Error('indexeddb-transaction-failed'));
+  });
+}
+
+function putRequest(store, value) {
+  return requestResult(store.put(value));
+}
+
+function getRequest(store, key) {
+  return requestResult(store.get(key));
+}
+
+export class RecipeMasterDataManager {
+  constructor(options = {}) {
+    this.indexedDB = options.indexedDB || globalThis.indexedDB;
+    this.dbName = options.dbName || DEFAULT_DB_NAME;
+    this.dbVersion = options.dbVersion || DEFAULT_DB_VERSION;
+    this.dbPromise = null;
+    this.commitQueue = Promise.resolve();
+  }
+
+  open() {
+    if (!this.indexedDB) return Promise.reject(new Error('indexeddb-unavailable'));
+    if (this.dbPromise) return this.dbPromise;
+    this.dbPromise = new Promise((resolve, reject) => {
+      const request = this.indexedDB.open(this.dbName, this.dbVersion);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('appState')) {
+          db.createObjectStore('appState', { keyPath: 'key' });
+        }
+        if (!db.objectStoreNames.contains('metadata')) {
+          db.createObjectStore('metadata', { keyPath: 'key' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => {
+        this.dbPromise = null;
+        reject(request.error || new Error('indexeddb-open-failed'));
+      };
+      request.onblocked = () => {
+        this.dbPromise = null;
+        reject(new Error('indexeddb-open-blocked'));
+      };
+    });
+    return this.dbPromise;
+  }
+
+  async readMetadata() {
+    const db = await this.open();
+    const tx = db.transaction(['metadata'], 'readonly');
+    const done = transactionDone(tx);
+    const record = await getRequest(tx.objectStore('metadata'), 'state');
+    await done;
+    return record || null;
+  }
+
+  async loadState() {
+    const db = await this.open();
+    const tx = db.transaction(['appState', 'metadata'], 'readonly');
+    const done = transactionDone(tx);
+    const appStore = tx.objectStore('appState');
+    const metaStore = tx.objectStore('metadata');
+    const meta = await getRequest(metaStore, 'state');
+    if (!meta || meta.authoritative !== true) {
+      await done;
+      return null;
+    }
+    const values = await Promise.all(COLLECTIONS.map(name => getRequest(appStore, name)));
+    await done;
+    const state = {};
+    COLLECTIONS.forEach((name, index) => {
+      if (!values[index] || !Object.prototype.hasOwnProperty.call(values[index], 'value')) {
+        throw new Error('indexeddb-state-record-missing:' + name);
+      }
+      state[name] = values[index].value;
+    });
+    return validateState(state);
+  }
+
+  async initializeFromLegacy(storage) {
+    const current = await this.loadState();
+    if (current) return { status: 'already-initialized', state: current };
+
+    const legacyState = parseLegacyState(storage);
+    const counts = Object.fromEntries(COLLECTIONS.map(name => [name, legacyState[name].length]));
+    const db = await this.open();
+    const tx = db.transaction(['appState', 'metadata'], 'readwrite');
+    const done = transactionDone(tx);
+    const appStore = tx.objectStore('appState');
+    const metaStore = tx.objectStore('metadata');
+
+    COLLECTIONS.forEach(name => {
+      appStore.put({ key: name, value: legacyState[name] });
+    });
+    metaStore.put({
+      key: 'state',
+      schemaVersion: 1,
+      authoritative: true,
+      migration: 'localstorage-v1',
+      migratedAt: new Date().toISOString(),
+      counts
+    });
+
+    await done;
+    const verified = await this.loadState();
+    if (!verified) throw new Error('migration-marker-not-committed');
+    COLLECTIONS.forEach(name => {
+      if (verified[name].length !== counts[name]) {
+        throw new Error('migration-count-mismatch:' + name);
+      }
+    });
+    return { status: 'migrated', state: verified, counts };
+  }
+
+  commitState(nextState) {
+    const validated = validateState(nextState);
+    const operation = this.commitQueue.then(async () => {
+      const db = await this.open();
+      const tx = db.transaction(['appState', 'metadata'], 'readwrite');
+      const done = transactionDone(tx);
+      const appStore = tx.objectStore('appState');
+      const metaStore = tx.objectStore('metadata');
+
+      COLLECTIONS.forEach(name => {
+        appStore.put({ key: name, value: validated[name] });
+      });
+      const previousMeta = await getRequest(metaStore, 'state');
+      metaStore.put({
+        key: 'state',
+        schemaVersion: this.dbVersion,
+        authoritative: true,
+        revision: (Number(previousMeta?.revision) || 0) + 1,
+        updatedAt: new Date().toISOString(),
+        counts: Object.fromEntries(COLLECTIONS.map(name => [name, validated[name].length]))
+      });
+      await done;
+      return { committed: true, state: clone(validated) };
+    });
+    this.commitQueue = operation.catch(() => undefined);
+    return operation;
+  }
+}
+
+export const DATA_MANAGER_SCHEMA = Object.freeze({
+  database: DEFAULT_DB_NAME,
+  version: DEFAULT_DB_VERSION,
+  stores: Object.freeze(['appState', 'metadata']),
+  collections: COLLECTIONS,
+  legacyKeys: LEGACY_KEYS
+});
