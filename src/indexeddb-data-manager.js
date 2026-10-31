@@ -74,8 +74,14 @@ export function validateState(input) {
 export function normalizeLegacyRecordIds(state) {
   const prefixes = { recipes: 'recipe', meatNotes: 'note', shopping: 'shop' };
   Object.entries(prefixes).forEach(([collection, prefix]) => {
+    if (!Array.isArray(state[collection])) {
+      throw new TypeError('invalid-collection:' + collection);
+    }
     const seen = new Set();
     state[collection].forEach((record, index) => {
+      if (!record || typeof record !== 'object' || Array.isArray(record)) {
+        throw new TypeError('invalid-record:' + collection + ':' + index);
+      }
       let id = String(record.id ?? '');
       if (!/^[A-Za-z0-9._:-]{1,100}$/.test(id) || seen.has(id)) {
         id = prefix + '-migrated-' + index.toString(36);
