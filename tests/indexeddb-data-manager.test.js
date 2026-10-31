@@ -132,7 +132,6 @@ test('rejects a failed readwrite transaction and leaves previous committed state
   const wrappedFactory = {
     open(name, version) {
       const request = indexedDB.open(name, version);
-      const originalSuccess = request.onsuccess;
       request.addEventListener('success', () => {
         const db = request.result;
         if (db.__rmpWrapped) return;
@@ -142,7 +141,22 @@ test('rejects a failed readwrite transaction and leaves previous committed state
           const tx = originalTransaction(...args);
           if (abortNextWrite && args[1] === 'readwrite') {
             abortNextWrite = false;
-            setTimeout(() => { try { tx.abort(); } catch {} }, 0);
+            const originalObjectStore = tx.objectStore.bind(tx);
+            tx.objectStore = name => {
+              const store = originalObjectStore(name);
+              if (name !== 'appState') return store;
+              const originalPut = store.put.bind(store);
+              let firstPut = true;
+              store.put = value => {
+                const request = originalPut(value);
+                if (firstPut) {
+                  firstPut = false;
+                  tx.abort();
+                }
+                return request;
+              };
+              return store;
+            };
           }
           return tx;
         };
