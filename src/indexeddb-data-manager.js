@@ -28,9 +28,27 @@ function validateCollection(name, value) {
     throw new TypeError('invalid-collection:' + name);
   }
   const ids = new Set();
+  const categoryNames = new Set();
   value.forEach((record, index) => {
     if (!record || typeof record !== 'object' || Array.isArray(record)) {
       throw new TypeError('invalid-record:' + name + ':' + index);
+    }
+    if (name === 'customCategories') {
+      if (typeof record.name !== 'string' || !record.name.trim()) {
+        throw new TypeError('missing-category-name:' + index);
+      }
+      const normalizedName = record.name.trim().toLocaleLowerCase('bg');
+      if (categoryNames.has(normalizedName)) {
+        throw new TypeError('duplicate-category-name:' + normalizedName);
+      }
+      categoryNames.add(normalizedName);
+      // Existing application categories are keyed by name and legitimately have no id.
+      if (record.id !== undefined && record.id !== null && String(record.id).trim() !== '') {
+        const id = String(record.id);
+        if (ids.has(id)) throw new TypeError('duplicate-record-id:' + name + ':' + id);
+        ids.add(id);
+      }
+      return;
     }
     if (record.id === undefined || record.id === null || String(record.id).trim() === '') {
       throw new TypeError('missing-record-id:' + name + ':' + index);
@@ -165,9 +183,8 @@ export class RecipeMasterDataManager {
   }
 
   async initializeFromLegacy(storage) {
-    const current = await this.loadState();
-    if (current) return { status: 'already-initialized', state: current };
-
+    // Parse before opening a write transaction so malformed legacy data cannot
+    // create an authoritative marker or partially initialize the new database.
     const legacyState = parseLegacyState(storage);
     const counts = Object.fromEntries(COLLECTIONS.map(name => [name, legacyState[name].length]));
     const db = await this.open();
@@ -176,27 +193,42 @@ export class RecipeMasterDataManager {
     const appStore = tx.objectStore('appState');
     const metaStore = tx.objectStore('metadata');
 
-    COLLECTIONS.forEach(name => {
-      appStore.put({ key: name, value: legacyState[name] });
-    });
-    metaStore.put({
-      key: 'state',
-      schemaVersion: 1,
-      authoritative: true,
-      migration: 'localstorage-v1',
-      migratedAt: new Date().toISOString(),
-      counts
-    });
+    // A readwrite transaction serializes initialization across tabs. The marker
+    // is checked inside that transaction, not in a preceding readonly request.
+    const markerRequest = metaStore.get('state');
+    markerRequest.onsuccess = () => {
+      const existing = markerRequest.result;
+      if (existing?.authoritative === true) return;
+      COLLECTIONS.forEach(name => {
+        appStore.put({ key: name, value: legacyState[name] });
+      });
+      metaStore.put({
+        key: 'state',
+        schemaVersion: this.dbVersion,
+        authoritative: true,
+        migration: 'localstorage-v1',
+        migratedAt: new Date().toISOString(),
+        revision: 0,
+        counts
+      });
+    };
 
     await done;
     const verified = await this.loadState();
     if (!verified) throw new Error('migration-marker-not-committed');
-    COLLECTIONS.forEach(name => {
-      if (verified[name].length !== counts[name]) {
-        throw new Error('migration-count-mismatch:' + name);
-      }
-    });
-    return { status: 'migrated', state: verified, counts };
+    const verifiedMeta = await this.readMetadata();
+    if (verifiedMeta?.migration === 'localstorage-v1') {
+      COLLECTIONS.forEach(name => {
+        if (verified[name].length !== verifiedMeta.counts[name]) {
+          throw new Error('migration-count-mismatch:' + name);
+        }
+      });
+    }
+    return {
+      status: verifiedMeta?.migration === 'localstorage-v1' ? 'migrated-or-already-migrated' : 'already-initialized',
+      state: verified,
+      counts: verifiedMeta?.counts || counts
+    };
   }
 
   commitState(nextState) {
