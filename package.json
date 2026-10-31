@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:data-manager": "node --test tests/indexeddb-data-manager.test.js"
+    "test:data-manager": "node --test tests/indexeddb-data-manager.test.js tests/backup-image-adapter.test.js"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.4"
