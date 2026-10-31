@@ -129,3 +129,34 @@ G. Only then consider merging to main and deploying.
 ## 9. Safety boundary
 
 This document does not activate IndexedDB state storage and does not alter runtime behavior. The current branch's existing LocalStorage persistence remains in place until the complete refactor and test suite are ready. The production main branch is not modified.
+
+
+## 10. Verified image-reference and backup compatibility findings (2026-10-31)
+
+The current application uses a separate IndexedDB database, `recipe-master-plus-images`, with an `images` object store. Recipe records refer to images through strings such as `idb:img-...`; custom category records use the `photo` field with the same pointer convention. The Data Manager stores these strings as opaque record values and must not copy Blob data into the state database.
+
+The standalone tests now cover:
+- migration of recipe and category records containing `idb:` pointers without rewriting those pointers;
+- state commits that leave an independently stored Blob record intact in `recipe-master-plus-images`;
+- confirmation that the state database contains only `appState` and `metadata`, not an `images` store;
+- preservation of legacy data-URL image fields as data URLs during state migration.
+
+These are fake-indexeddb compatibility tests. They do not execute the application's browser-only image functions, FileReader, URL.createObjectURL, or actual user backup/import UI.
+
+### Existing JSON backup behavior observed in index.html
+
+- Export clones recipes and custom categories, resolves each `idb:` pointer through `rmpImageGet()`, and embeds the resulting data URL in the JSON payload.
+- Export aborts if any referenced image cannot be read, leaving application state untouched.
+- Import validation currently accepts image data URLs through `safeImageUrl`; it does not treat `idb:` pointers as portable backup images.
+- Restore currently assigns the imported collections and persists them through the synchronous LocalStorage `persist()` path. Imported image data URLs remain embedded in recipe/category state until the startup image hydration process converts them into separate Blob records.
+- The Data Manager is not wired into export or restore. No tested adapter currently coordinates state commits with image Blob writes during a future IndexedDB restore.
+
+### Required work before activation
+
+1. Extract or expose the actual image serialization/deserialization functions behind a testable adapter without duplicating their behavior.
+2. Make restore stage and validate every image Blob first, verify all staged image records, then commit state references. On failure, retain the previous state and avoid deleting any pre-existing image records.
+3. Define conservative orphan-image cleanup separately; never delete images merely because a state commit or restore failed.
+4. Test export of both Blob-backed records and legacy `dataUrl` records, missing/corrupt images, restore rollback, duplicate references, and reload recovery.
+5. Run browser tests on Android Chrome, including offline export/import and app restart.
+
+**Activation remains blocked.** The new state Data Manager is still a preparation module and must not be imported by `index.html` until the above lifecycle and browser tests pass.
