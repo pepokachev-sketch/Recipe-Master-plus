@@ -1,9 +1,9 @@
 /**
  * Recipe Master Plus — backup/image lifecycle adapter.
  *
- * Preparation module: deliberately not imported by index.html yet.
- * It isolates the actual backup image transformation rules so they can be
- * tested without DOM/FileReader/download UI dependencies.
+ * Integrated by index.html for backup export, replace-import and merge-import.
+ * The adapter isolates image transformation rules from DOM/FileReader/download
+ * UI dependencies so the same logic can be tested independently.
  */
 const IMAGE_DATA_URL = /^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i;
 
