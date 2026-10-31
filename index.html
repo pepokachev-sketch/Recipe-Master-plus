@@ -1319,7 +1319,7 @@ $('mergeData').onclick=()=>readBackupFile(async d=>{
  alert(`Обединяването завърши. Добавени: ${nr} рецепти, ${nm} бележки и ${ns} продукта. Съществуващите дубликати са пропуснати.`);
    }
   });
- }catch(error){console.error('Recipe Master Plus: обединяването е прекратено',error);alert('Обединяването не завърши, защото снимките не можаха да бъдат възстановени и проверени.');}
+ }catch(error){console.error('Recipe Master Plus: обединяването е прекратено',error);alert('Обединяването не завърши. Неуспешна проверка или запис на снимките/данните; виж конзолата за подробности. Последното успешно запазено състояние е възстановено.');}
 });
 let tfInterval=null,tfEnd=0,tfRemaining=0,tfRunning=false,tfAlarmInterval=null,tfAudio=null;
 const tf=$('floatingTimer');
