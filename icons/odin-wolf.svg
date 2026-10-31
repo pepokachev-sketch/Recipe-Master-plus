@@ -1,12 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Odin wolf">
-<circle cx="32" cy="32" r="31" fill="#202936"/>
-<path d="M10 13 25 20 32 17 39 20 54 13 51 34 45 49 32 59 19 49 13 34Z" fill="#f2f4f7"/>
-<path d="M13 17 25 23 19 31Z" fill="#9ba6b4"/>
-<path d="M51 17 39 23 45 31Z" fill="#9ba6b4"/>
-<path d="M20 33Q25 28 30 32L27 36 20 36Z" fill="#202936"/>
-<path d="M34 32Q40 28 45 33L44 36 36 36Z" fill="#202936"/>
-<path d="M22 33Q26 30 29 33L25 34Z" fill="#39bfff"/>
-<path d="M32 37 27 44 32 48 37 44Z" fill="#303b49"/>
-<path d="M27 44 32 48 37 44" fill="none" stroke="#303b49" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M19 47 25 49 32 56 39 49 45 47 41 53 32 61 23 53Z" fill="#d5dbe3"/>
+<path d="M5 45A27 27 0 0 1 45 7" fill="none" stroke="#F2A52D" stroke-width="4" stroke-linecap="round"/>
+<!-- wolf head in profile, facing right -->
+<path d="M13 31 10 8 27 22Q35 18 43 22L55 10 55 30Q60 35 60 42L53 47 47 48Q43 54 34 55L29 63 22 54Q15 55 10 49L5 51 9 42Q8 36 13 31Z" fill="#DCE1E8" stroke="#F7F8FA" stroke-width="1.3" stroke-linejoin="round"/>
+<path d="M14 14 24 24 16 27Z" fill="#8994A2"/>
+<path d="M46 24 53 15 52 31Z" fill="#8994A2"/>
+<path d="M17 43Q22 49 30 47L24 53Q17 52 13 47Z" fill="#B7C0CB"/>
+<path d="M39 35Q48 30 56 39L61 42 54 47Q46 48 39 43Z" fill="#FFFFFF"/>
+<path d="M41 45Q49 50 57 46Q52 54 42 53L35 48Z" fill="#AAB4C0"/>
+<!-- narrowed blue eye -->
+<path d="M25 32Q32 27 39 32Q33 36 26 34Z" fill="#273443"/>
+<path d="M27 32Q33 29 37 32Q33 34 27 33Z" fill="#36BDF5"/>
+<path d="M24 31Q32 26 40 31" fill="none" stroke="#273443" stroke-width="1.8" stroke-linecap="round"/>
+<path d="M57 38 63 41 57 45 53 42Z" fill="#202936"/>
+<path d="M45 49Q51 51 56 47" fill="none" stroke="#596574" stroke-width="1.2" stroke-linecap="round"/>
 </svg>
