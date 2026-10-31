@@ -779,10 +779,12 @@ const categoryIcons={
  'Супи и чорби':'🍲','Месни ястия':'🥩','Ястия на фурна':'🍖','Салати и предястия':'🥗','Десерти':'🍰','Зимнина и консервиране':'🫙','Домашни колбаси и мезета':'🌭','Сосове и маринати':'🫙','Тестени изделия':'🥐','Рецепти от механи и ресторанти':'🍽️','Други':'🍴'
 };
 // Миграция: пилешките рецепти се запазват и преминават към Месни ястия.
-let recipesMigrated=false;recipes.forEach(r=>{if(r.cat==='Пилешки ястия'){r.cat='Месни ястия';recipesMigrated=true}});
-if(recipesMigrated){try{localStorage.setItem('myrecipes_v1',JSON.stringify(recipes));lastCommittedState.recipes=cloneState(recipes)}catch(error){console.warn('Recipe Master Plus: миграцията ще бъде повторена при следващо успешно запазване',error)}}
+// При проблем с което и да е локално хранилище не променяме записаните данни.
+let recipesMigrated=false;
+if(!storageReadErrors.length)recipes.forEach(r=>{if(r.cat==='Пилешки ястия'){r.cat='Месни ястия';recipesMigrated=true}});
 categories=[...categories,...customCategories.map(c=>c.name).filter(Boolean)];
 lastCommittedState.categories=[...categories];
+if(recipesMigrated)persist();
 let previewRecipeId=null,previewTab='ingredients',previewServings=1,previewScaleMode='servings',previewBaseAmount='';
 function selectRecipePreview(id){
  const r=recipes.find(x=>x.id===id);if(!r)return;
@@ -1146,12 +1148,15 @@ function readBackupFile(onValid){
    const d=JSON.parse(reader.result);
    const isRecord=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
    const safeId=id=>id===undefined||id===null||id===''||(typeof id==='string'&&/^[A-Za-z0-9._:-]{1,100}$/.test(id))||(typeof id==='number'&&Number.isFinite(id));
+   const validText=v=>v===undefined||v===null||typeof v==='string';
    if(!isRecord(d)||!Array.isArray(d.recipes)||('meatNotes'in d&&!Array.isArray(d.meatNotes))||('shopping'in d&&!Array.isArray(d.shopping))||('customCategories'in d&&!Array.isArray(d.customCategories)))throw Error('invalid');
-   if(d.recipes.some(r=>!isRecord(r)||typeof r.name!=='string'||!safeId(r.id)))throw Error('invalid');
+   if(d.recipes.some(r=>!isRecord(r)||typeof r.name!=='string'||!r.name.trim()||!safeId(r.id)||!validText(r.cat)||!validText(r.ing)||!validText(r.steps)||!validText(r.notes)||!validText(r.img)||(r.tags!==undefined&&typeof r.tags!=='string'&&(!Array.isArray(r.tags)||r.tags.some(t=>typeof t!=='string')))||(r.ingredients!==undefined&&(!Array.isArray(r.ingredients)||r.ingredients.some(x=>!isRecord(x)||['amount','unit','name'].some(k=>x[k]!==undefined&&typeof x[k]!=='string'&&typeof x[k]!=='number'))))))throw Error('invalid');
    if((d.meatNotes||[]).some(x=>!isRecord(x)||!safeId(x.id)))throw Error('invalid');
    if((d.shopping||[]).some(x=>!isRecord(x)||!safeId(x.id)||typeof x.text!=='string'))throw Error('invalid');
    if((d.customCategories||[]).some(c=>!isRecord(c)||typeof c.name!=='string'||!c.name.trim()||(c.description!==undefined&&typeof c.description!=='string')||(c.photo!==undefined&&typeof c.photo!=='string')||(c.photo&&!safeImageUrl(c.photo))))throw Error('invalid');
-   const ensureIds=(items,prefix)=>items.forEach((x,i)=>{if(x.id===undefined||x.id===null||x.id==='')x.id=prefix+'-'+Date.now().toString(36)+'-'+i.toString(36);else x.id=String(x.id)});
+   const categoryNames=new Set();
+   if((d.customCategories||[]).some(c=>{const key=c.name.trim().toLocaleLowerCase('bg');if(categoryNames.has(key))return true;categoryNames.add(key);return false}))throw Error('invalid');
+   const ensureIds=(items,prefix)=>{const seen=new Set();items.forEach((x,i)=>{let id=String(x.id??'').trim();if(!id||!/^[A-Za-z0-9._:-]{1,100}$/.test(id)||seen.has(id)){const base=prefix+'-'+Date.now().toString(36)+'-'+i.toString(36);id=base;let suffix=1;while(seen.has(id))id=base+'-'+suffix++}x.id=id;seen.add(id)})};
    ensureIds(d.recipes,'recipe');ensureIds(d.meatNotes||[],'note');ensureIds(d.shopping||[],'shop');
    onValid(d);
   }catch(error){console.warn('Recipe Master Plus: невалиден архив',error);alert('Файлът не е валиден архив на Recipe Master Plus или съдържа неподдържани данни. Текущите ти данни не са променени.')}
