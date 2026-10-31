@@ -1,25 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
-<title id="title">Odin wolf</title>
-<defs>
-  <linearGradient id="fur" x1="18" y1="12" x2="104" y2="112" gradientUnits="userSpaceOnUse">
-    <stop stop-color="#fff"/><stop offset=".55" stop-color="#d9dde3"/><stop offset="1" stop-color="#858e9b"/>
-  </linearGradient>
-  <linearGradient id="ember" x1="18" y1="20" x2="105" y2="105" gradientUnits="userSpaceOnUse">
-    <stop stop-color="#ffd36a"/><stop offset="1" stop-color="#f47721"/>
-  </linearGradient>
-</defs>
-<circle cx="64" cy="64" r="57" fill="#171c25"/>
-<path d="M19 43 31 12 53 32Q68 22 83 30L105 9 108 47Q119 62 111 80L92 106 72 116 56 103 39 109 43 91Q25 80 19 43Z" fill="url(#fur)" stroke="#f7f8fa" stroke-width="2.5" stroke-linejoin="round"/>
-<path d="m31 17 18 20-17-2Z" fill="#343c48"/>
-<path d="m88 31 14-15-1 31-13-8Z" fill="#343c48"/>
-<path d="M45 51Q60 39 78 48Q66 57 45 55Z" fill="#222a35"/>
-<path d="M51 51Q64 44 75 49Q65 53 51 53Z" fill="#36b8ff"/>
-<path d="M53 51Q65 47 73 49" fill="none" stroke="#d9f5ff" stroke-width="1.8" stroke-linecap="round"/>
-<path d="M79 57Q91 60 103 70L115 72 104 82Q88 83 75 72Z" fill="#f3f4f6"/>
-<path d="m102 70 13 2-10 7-8-2Z" fill="#202630"/>
-<path d="M49 75Q62 84 79 77Q70 94 53 91Z" fill="#a0a8b3"/>
-<path d="M29 69Q34 87 51 94L42 103Q24 91 21 68Z" fill="#f7f8fa"/>
-<path d="M18 43Q26 29 39 25" fill="none" stroke="url(#ember)" stroke-width="5" stroke-linecap="round"/>
-<path d="M31 100Q43 113 58 116" fill="none" stroke="url(#ember)" stroke-width="4" stroke-linecap="round"/>
-<path d="m61 94 11 12 9-13" fill="none" stroke="#737d8b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Odin wolf">
+<circle cx="32" cy="32" r="31" fill="#202936"/>
+<path d="M10 13 25 20 32 17 39 20 54 13 51 34 45 49 32 59 19 49 13 34Z" fill="#f2f4f7"/>
+<path d="M13 17 25 23 19 31Z" fill="#9ba6b4"/>
+<path d="M51 17 39 23 45 31Z" fill="#9ba6b4"/>
+<path d="M20 33Q25 28 30 32L27 36 20 36Z" fill="#202936"/>
+<path d="M34 32Q40 28 45 33L44 36 36 36Z" fill="#202936"/>
+<path d="M22 33Q26 30 29 33L25 34Z" fill="#39bfff"/>
+<path d="M32 37 27 44 32 48 37 44Z" fill="#303b49"/>
+<path d="M27 44 32 48 37 44" fill="none" stroke="#303b49" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M19 47 25 49 32 56 39 49 45 47 41 53 32 61 23 53Z" fill="#d5dbe3"/>
 </svg>
