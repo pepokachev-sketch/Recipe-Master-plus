@@ -338,3 +338,85 @@ test('legacy image data URLs remain data URLs during migration and are not mista
   }));
   assert.equal(result.state.recipes[0].img, dataUrl);
 });
+
+
+test('rejects null, array and primitive legacy records before creating an authoritative migration', async () => {
+  const malformedRecords = [
+    { label: 'null', value: null },
+    { label: 'array', value: ['not', 'a', 'record'] },
+    { label: 'string', value: 'not-a-record' },
+    { label: 'number', value: 42 }
+  ];
+
+  for (const item of malformedRecords) {
+    const rawRecipes = JSON.stringify([{ id: 'valid-before-malformed' }, item.value]);
+    const legacy = memoryStorage({
+      myrecipes_v1: rawRecipes,
+      mymeat_v1: '[]',
+      myshop_v1: '[]',
+      myrecipes_customcats_v1: '[]'
+    });
+    const before = legacy.snapshot();
+    const manager = new RecipeMasterDataManager({
+      indexedDB,
+      dbName: 'rmp-invalid-record-' + item.label + '-' + crypto.randomUUID()
+    });
+
+    await assert.rejects(
+      manager.initializeFromLegacy(legacy),
+      /invalid-record:recipes:1/
+    );
+    assert.deepEqual(legacy.snapshot(), before, 'legacy LocalStorage snapshot must remain unchanged');
+    assert.equal(await manager.loadState(), null, 'malformed input must not create an authoritative marker');
+    assert.equal(await manager.readMetadata(), null, 'malformed input must not create migration metadata');
+  }
+});
+
+test('rejects malformed legacy records in non-recipe collections without changing LocalStorage', async () => {
+  const cases = [
+    { key: 'mymeat_v1', expected: /invalid-record:meatNotes:0/ },
+    { key: 'myshop_v1', expected: /invalid-record:shopping:0/ },
+    { key: 'myrecipes_customcats_v1', expected: /invalid-record:customCategories:0/ }
+  ];
+
+  for (const item of cases) {
+    const legacy = memoryStorage({
+      myrecipes_v1: '[]',
+      mymeat_v1: '[]',
+      myshop_v1: '[]',
+      myrecipes_customcats_v1: '[]',
+      [item.key]: JSON.stringify([null])
+    });
+    const before = legacy.snapshot();
+    const manager = new RecipeMasterDataManager({
+      indexedDB,
+      dbName: 'rmp-invalid-collection-record-' + crypto.randomUUID()
+    });
+
+    await assert.rejects(manager.initializeFromLegacy(legacy), item.expected);
+    assert.deepEqual(legacy.snapshot(), before);
+    assert.equal(await manager.loadState(), null);
+    assert.equal(await manager.readMetadata(), null);
+  }
+});
+
+test('generated migration IDs do not collide with later valid legacy IDs', () => {
+  const legacy = memoryStorage({
+    myrecipes_v1: JSON.stringify([
+      { id: 'existing' },
+      { name: 'Missing ID gets a generated value' },
+      { id: 'recipe-migrated-1', name: 'Pre-existing generated-looking ID' }
+    ]),
+    mymeat_v1: '[]',
+    myshop_v1: '[]',
+    myrecipes_customcats_v1: '[]'
+  });
+  const before = legacy.snapshot();
+  const state = parseLegacyState(legacy);
+  const ids = state.recipes.map(record => record.id);
+
+  assert.equal(new Set(ids).size, ids.length);
+  assert.equal(ids[2], 'recipe-migrated-1');
+  assert.notEqual(ids[1], ids[2]);
+  assert.deepEqual(legacy.snapshot(), before);
+});
