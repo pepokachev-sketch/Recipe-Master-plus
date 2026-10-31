@@ -734,6 +734,12 @@ function persist(){
  try{
   const values=[JSON.stringify(recipes),JSON.stringify(meatNotes),JSON.stringify(shopping),JSON.stringify(customCategories)];
   previous=keys.map(k=>localStorage.getItem(k));
+  const nextStorageUnits=values.reduce((total,value)=>total+value.length,0);
+  const currentStorageUnits=previous.reduce((total,value)=>total+(value===null?0:value.length),0);
+  const safeStorageBudget=3.5*1024*1024;
+  if(nextStorageUnits>safeStorageBudget&&nextStorageUnits>currentStorageUnits){
+   throw new Error('storage-budget-preflight');
+  }
   keys.forEach((k,i)=>localStorage.setItem(k,values[i]));
   lastCommittedState={recipes:cloneState(recipes),meatNotes:cloneState(meatNotes),shopping:cloneState(shopping),customCategories:cloneState(customCategories),categories:[...categories]};
   return true;
@@ -743,7 +749,7 @@ function persist(){
   if(activeRecipe)activeRecipe=recipes.find(r=>r.id===activeRecipe.id)||null;
   console.error('Recipe Master Plus: грешка при запис на данните',error);
   try{if($('recipeCount'))renderRecipes();if($('meatList'))renderMeat();if($('shopList'))renderShop();if($('customCategoryList'))renderCustomCategoryList();if(activeRecipe&&$('detailDialog')?.open)renderRecipeDetail()}catch(renderError){console.error('Recipe Master Plus: грешка при възстановяване на интерфейса',renderError)}
-  alert('Неуспешно запазване. Промените бяха върнати към последното успешно състояние. Възможно е локалното хранилище да е запълнено. Изтегли резервно копие и освободи място, преди да продължиш.');
+  alert(error?.message==='storage-budget-preflight'?'Записването е спряно предварително, защото данните на Recipe Master Plus вече надхвърлят безопасния бюджет за локално хранилище. Промените са отменени. Изтегли резервно копие и освободи място — например премахни ненужни снимки или дублирани записи — преди да добавяш още снимки.':'Неуспешно запазване. Промените бяха върнати към последното успешно състояние. Възможно е локалното хранилище да е запълнено. Изтегли резервно копие и освободи място, преди да продължиш.');
   return false;
  }
 }
