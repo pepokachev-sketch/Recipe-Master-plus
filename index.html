@@ -568,10 +568,21 @@ body{padding-bottom:76px}
 .ingredient-calculated{grid-column:1/-1;padding:5px 8px;border-radius:8px;background:rgba(255,121,0,.08);color:var(--brand);font-size:11px;line-height:1.4}.ingredient-calculated:empty{display:none}.editor-scale-panel{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:10px 0;padding:11px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}.editor-scale-panel label{margin:0 0 5px}.editor-scale-panel input,.editor-scale-panel select{width:100%}.editor-scale-hint{grid-column:1/-1;color:var(--muted);font-size:11px}
 @media(max-width:520px){.ingredient-row{grid-template-columns:68px 58px minmax(0,1fr) 32px;padding:8px 7px;gap:6px}.ingredient-row input{padding:9px 6px;font-size:13px}.ingredient-row .ingredient-unit{text-align:center;padding-left:2px;padding-right:2px}.ingredient-remove{width:32px;height:36px}}
 
+
+/* OΔIN creator signature in the home hero */
+.hero{position:relative}
+.hero .odin-signature{position:absolute;z-index:3;top:13px;right:max(20px,calc((100% - 1240px)/2 + 76px));display:flex;align-items:center;gap:7px;color:#f3f4f6;font-size:16px;font-weight:800;letter-spacing:1.25px;line-height:1;text-shadow:0 2px 8px #0009;opacity:.94;pointer-events:none}
+.hero .odin-signature img{display:block;width:32px;height:32px;object-fit:contain;flex:0 0 32px}
+@media(max-width:520px){
+ .hero{padding-top:38px}
+ .hero .odin-signature{top:9px;right:68px;gap:5px;font-size:12px;letter-spacing:1px}
+ .hero .odin-signature img{width:25px;height:25px;flex-basis:25px}
+}
 </style>
 </head>
 <body>
 <header class="hero"><div class="hero-inner">
+ <div class="odin-signature" aria-label="OΔIN"><img src="./icons/odin-wolf.svg?v=5" alt="" width="32" height="32"><span>OΔIN</span></div>
  <div class="brandline"><div class="logo" aria-label="Лого с готварска шапка"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path d="M15 31c-6-2-9-7-8-13 1-7 8-11 15-9 3-7 8-10 14-8 6 1 10 6 10 12 7-1 13 4 13 11 0 4-2 7-6 9v18H15V31Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 35h38M20 49h28" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg></div><div><h1>Recipe Master Plus</h1><p>Вдъхновение за всяко ястие. Майсторство във всяка рецепта.</p></div></div>
  <div class="hero-actions"><button class="icon-btn" id="wakeLockToggle" type="button" title="Поддържай екрана включен" aria-label="Поддържай екрана включен" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M12 7v4M9.5 9.5h5"/></svg></button></div>
 </div></header>
