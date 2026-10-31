@@ -736,8 +736,9 @@ function persist(){
  }catch(error){
   if(previous){keys.forEach(k=>{try{localStorage.removeItem(k)}catch(rollbackError){console.error('Recipe Master Plus: неуспешно освобождаване при възстановяване',rollbackError)}});keys.forEach((k,i)=>{if(previous[i]!==null)try{localStorage.setItem(k,previous[i])}catch(rollbackError){console.error('Recipe Master Plus: неуспешно възстановяване на предишните данни',rollbackError)}})}
   recipes=cloneState(lastCommittedState.recipes);meatNotes=cloneState(lastCommittedState.meatNotes);shopping=cloneState(lastCommittedState.shopping);customCategories=cloneState(lastCommittedState.customCategories);categories=[...lastCommittedState.categories];
+  if(activeRecipe)activeRecipe=recipes.find(r=>r.id===activeRecipe.id)||null;
   console.error('Recipe Master Plus: грешка при запис на данните',error);
-  try{if($('recipeCount'))renderRecipes();if($('meatList'))renderMeat();if($('shopList'))renderShop();if($('customCategoryList'))renderCustomCategoryList()}catch(renderError){console.error('Recipe Master Plus: грешка при възстановяване на интерфейса',renderError)}
+  try{if($('recipeCount'))renderRecipes();if($('meatList'))renderMeat();if($('shopList'))renderShop();if($('customCategoryList'))renderCustomCategoryList();if(activeRecipe&&$('detailDialog')?.open)renderRecipeDetail()}catch(renderError){console.error('Recipe Master Plus: грешка при възстановяване на интерфейса',renderError)}
   alert('Неуспешно запазване. Промените бяха върнати към последното успешно състояние. Възможно е локалното хранилище да е запълнено. Изтегли резервно копие и освободи място, преди да продължиш.');
   return false;
  }
