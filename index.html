@@ -767,40 +767,55 @@ function openRmpImageDb(){
   const request=indexedDB.open('recipe-master-plus-images',1);
   request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains('images'))db.createObjectStore('images',{keyPath:'id'})};
   request.onsuccess=()=>resolve(request.result);
-  request.onerror=()=>reject(request.error||new Error('indexeddb-open-failed'));
-  request.onblocked=()=>reject(new Error('indexeddb-blocked'));
+  request.onerror=()=>{rmpImageDbPromise=null;reject(request.error||new Error('indexeddb-open-failed'))};
+  request.onblocked=()=>{rmpImageDbPromise=null;reject(new Error('indexeddb-blocked'))};
  });
  return rmpImageDbPromise;
 }
+async function rmpImageRecordGet(id){
+ const db=await openRmpImageDb();
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction('images','readonly'),request=tx.objectStore('images').get(id);
+  request.onsuccess=()=>resolve(request.result||null);
+  request.onerror=()=>reject(request.error||new Error('indexeddb-read-failed'));
+ });
+}
 async function rmpImagePut(id,dataUrl){
+ if(typeof dataUrl!=='string'||!/^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(dataUrl))throw new Error('invalid-image-data');
+ const response=await fetch(dataUrl);
+ const blob=await response.blob();
+ if(!blob.size||!/^image\/(?:jpeg|png|webp|gif)$/i.test(blob.type))throw new Error('invalid-image-blob');
+ const record={id,blob,mimeType:blob.type,size:blob.size,createdAt:Date.now()};
  const db=await openRmpImageDb();
  await new Promise((resolve,reject)=>{
   const tx=db.transaction('images','readwrite');
-  tx.objectStore('images').put({id,dataUrl});
+  tx.objectStore('images').put(record);
   tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('indexeddb-write-failed'));tx.onabort=()=>reject(tx.error||new Error('indexeddb-write-aborted'));
  });
- const check=await rmpImageGet(id);
- if(check!==dataUrl)throw new Error('indexeddb-verify-failed');
- const response=await fetch(dataUrl);
- const blob=await response.blob();
- const url=URL.createObjectURL(blob);
+ const check=await rmpImageRecordGet(id);
+ if(!check||!(check.blob instanceof Blob)||check.blob.size!==blob.size||check.blob.type!==blob.type)throw new Error('indexeddb-verify-failed');
+ const url=URL.createObjectURL(check.blob);
  const previous=rmpImageUrls.get(id);if(previous)URL.revokeObjectURL(previous);
  rmpImageUrls.set(id,url);
  return 'idb:'+id;
 }
 async function rmpImageGet(id){
- const db=await openRmpImageDb();
- return new Promise((resolve,reject)=>{
-  const tx=db.transaction('images','readonly'),request=tx.objectStore('images').get(id);
-  request.onsuccess=()=>resolve(request.result?.dataUrl||null);
-  request.onerror=()=>reject(request.error||new Error('indexeddb-read-failed'));
+ const record=await rmpImageRecordGet(id);if(!record)return null;
+ if(typeof record.dataUrl==='string')return record.dataUrl;
+ if(!(record.blob instanceof Blob))return null;
+ return await new Promise((resolve,reject)=>{
+  const reader=new FileReader();reader.onload=()=>resolve(typeof reader.result==='string'?reader.result:null);
+  reader.onerror=()=>reject(reader.error||new Error('image-read-failed'));reader.readAsDataURL(record.blob);
  });
 }
 async function rmpResolveImage(id){
  if(rmpImageUrls.has(id))return rmpImageUrls.get(id);
- const dataUrl=await rmpImageGet(id);if(!dataUrl)return '';
- const blob=await (await fetch(dataUrl)).blob(),url=URL.createObjectURL(blob);
- rmpImageUrls.set(id,url);return url;
+ const record=await rmpImageRecordGet(id);if(!record)return '';
+ let blob=record.blob;
+ // Backward compatibility: older versions stored Base64 data URLs in IndexedDB.
+ if(!(blob instanceof Blob)&&typeof record.dataUrl==='string')blob=await (await fetch(record.dataUrl)).blob();
+ if(!(blob instanceof Blob)||!blob.size)return '';
+ const url=URL.createObjectURL(blob);rmpImageUrls.set(id,url);return url;
 }
 function rmpNewImageId(){
  return 'img-'+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
@@ -826,10 +841,8 @@ async function rmpHydrateImages(){
  const refs=[];
  recipes.forEach(r=>{if(typeof r.img==='string'&&r.img.startsWith('idb:'))refs.push(r.img.slice(4))});
  customCategories.forEach(c=>{if(typeof c.photo==='string'&&c.photo.startsWith('idb:'))refs.push(c.photo.slice(4))});
- for(const id of new Set(refs))await rmpResolveImage(id);
+ for(const id of new Set(refs)){const url=await rmpResolveImage(id);if(!url)throw new Error('image-reference-unavailable:'+id)}
 }
-
-function safeImageUrl(value){const s=String(value||'');if(s.startsWith('idb:'))return rmpImageUrls.get(s.slice(4))||'';if(/^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+=*$/i.test(s))return s;return safeUrl(s)}
 function initCats(){const sel=$('rcat');if(!sel)return;sel.innerHTML='';[...new Set(categories)].forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)})}
 function switchTab(id,options={}){const currentTab=document.querySelector('.tabs button.active')?.dataset.tab;if(id==='recipes'&&currentTab!=='recipes'&&!options.preserveCategory)selectedCategory=null;if(options.history!==false&&currentTab!==id){const state=id==='recipes'?{rmpView:'home'}:{rmpView:'tab',tab:id,selectedCategory};history.pushState(state,'',location.href)}document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===id));document.querySelectorAll('.panel').forEach(p=>{p.classList.toggle('active',p.id===id);p.hidden=p.id!==id});if(id==='recipes')renderRecipes();if(id==='meat')renderMeat();if(id==='shopping')renderShop();requestAnimationFrame(()=>{window.scrollTo({top:0,behavior:'instant'});if(id==='add')$('rname').focus({preventScroll:true})})}
 $('tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)switchTab(b.dataset.tab)});
