@@ -684,7 +684,7 @@ body{padding-bottom:76px}
 <script>
 let categories=['Супи и чорби','Месни ястия','Ястия на фурна','Салати и предястия','Десерти','Зимнина и консервиране','Домашни колбаси и мезета','Сосове и маринати','Тестени изделия','Рецепти от механи и ресторанти','Други'];
 const $=id=>document.getElementById(id);
-const rmpBackupAdapterPromise=import('./src/backup-image-adapter.js');
+const rmpLoadBackupAdapter=()=>import('./src/backup-image-adapter.js');
 const storageReadErrors=[];
 const read=(key,fallback)=>{
  let raw=null;
@@ -1247,7 +1247,7 @@ async function downloadBackup(){
  }
  const exportRecipes=cloneState(recipes),exportCategories=cloneState(customCategories);
  try{
-  const adapter=await rmpBackupAdapterPromise;
+  const adapter=await rmpLoadBackupAdapter();
   const portable=await adapter.serializeBackupImages({recipes:exportRecipes,customCategories:exportCategories},rmpImageGet);
   exportRecipes.splice(0,exportRecipes.length,...portable.recipes);
   exportCategories.splice(0,exportCategories.length,...portable.customCategories);
@@ -1284,7 +1284,7 @@ function readBackupFile(onValid){
 $('importData').onclick=()=>readBackupFile(async d=>{
  if(!confirm(`Ще замениш ${recipes.length} рецепти, ${meatNotes.length} технологични бележки и ${shopping.length} продукта с данните от архива. Препоръчително е първо да изтеглиш резервно копие. Продължаваме ли?`))return;
  try{
-  const adapter=await rmpBackupAdapterPromise;
+  const adapter=await rmpLoadBackupAdapter();
   await adapter.restoreBackupImages(d,{
    makeId:rmpNewImageId,
    writeImage:async(id,dataUrl)=>{await rmpImagePut(id,dataUrl)},
@@ -1302,7 +1302,7 @@ $('importData').onclick=()=>readBackupFile(async d=>{
 });
 $('mergeData').onclick=()=>readBackupFile(async d=>{
  try{
-  const adapter=await rmpBackupAdapterPromise;
+  const adapter=await rmpLoadBackupAdapter();
   await adapter.restoreBackupImages(d,{
    makeId:rmpNewImageId,
    writeImage:async(id,dataUrl)=>{await rmpImagePut(id,dataUrl)},
