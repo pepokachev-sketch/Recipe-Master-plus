@@ -160,3 +160,31 @@ These are fake-indexeddb compatibility tests. They do not execute the applicatio
 5. Run browser tests on Android Chrome, including offline export/import and app restart.
 
 **Activation remains blocked.** The new state Data Manager is still a preparation module and must not be imported by `index.html` until the above lifecycle and browser tests pass.
+
+
+## 11. Isolated backup image lifecycle adapter (2026-10-31)
+
+Added `src/backup-image-adapter.js` as a preparation module. It is intentionally not imported by `index.html` yet.
+
+The adapter centralizes the backup image transformation rules in testable functions:
+
+- `serializeBackupImages(state, getImageDataUrl)` clones the state, resolves each unique `idb:` reference once, validates the returned image data URL, and preserves legacy data URLs.
+- `restoreBackupImages(state, options)` validates portable data URLs, writes each unique image once, reads each staged image back for verification, replaces data URLs with `idb:` references, and invokes the state commit only after every image is verified.
+- Incoming `idb:` references are rejected because they are device-local pointers, not portable backup content.
+- If image staging or verification fails, state commit is not attempted.
+- If state commit fails, staged image records are deliberately retained. The adapter never deletes existing or newly staged records; conservative orphan collection remains a separate future task.
+
+The adapter uses injected image-store and state-commit functions. This allows deterministic unit tests but does not yet prove the browser IndexedDB, Blob, FileReader, or UI integration. The current app's export/import handlers in `index.html` still use their existing implementation and have not yet been switched to this adapter.
+
+### Automated coverage added
+
+- Blob-backed image export references and legacy data URL preservation.
+- Export failure for missing/corrupt image data without mutating the input state.
+- Restore staging and read-back verification before state commit.
+- Deduplication when multiple records use the same image data URL.
+- No state commit when an image is missing/corrupt.
+- State commit failure leaves prior application state uncommitted and staged images retained.
+- Rejection of device-local `idb:` pointers in portable import payloads.
+- Restore with no images.
+
+The CI command now runs both the Data Manager and backup image adapter test files. Passing unit tests do not replace Android Chrome browser tests or integration of this adapter into the actual export/restore UI. **Data Manager activation remains blocked.**
