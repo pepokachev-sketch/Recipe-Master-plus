@@ -1,0 +1,19 @@
+{
+  "name": "Recipe Master Plus",
+  "short_name": "Recipe Master",
+  "description": "Твоите рецепти, твоят вкус",
+  "lang": "bg",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101012",
+  "theme_color": "#101012",
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
