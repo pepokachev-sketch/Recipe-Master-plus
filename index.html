@@ -841,7 +841,14 @@ async function rmpHydrateImages(){
  const refs=[];
  recipes.forEach(r=>{if(typeof r.img==='string'&&r.img.startsWith('idb:'))refs.push(r.img.slice(4))});
  customCategories.forEach(c=>{if(typeof c.photo==='string'&&c.photo.startsWith('idb:'))refs.push(c.photo.slice(4))});
- for(const id of new Set(refs)){const url=await rmpResolveImage(id);if(!url)throw new Error('image-reference-unavailable:'+id)}
+ for(const id of new Set(refs)){
+  const existing=await rmpImageRecordGet(id);
+  if(existing&&!(existing.blob instanceof Blob)&&typeof existing.dataUrl==='string'){
+   await rmpImagePut(id,existing.dataUrl);
+  }
+  const url=await rmpResolveImage(id);
+  if(!url)throw new Error('image-reference-unavailable:'+id);
+ }
 }
 function initCats(){const sel=$('rcat');if(!sel)return;sel.innerHTML='';[...new Set(categories)].forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)})}
 function switchTab(id,options={}){const currentTab=document.querySelector('.tabs button.active')?.dataset.tab;if(id==='recipes'&&currentTab!=='recipes'&&!options.preserveCategory)selectedCategory=null;if(options.history!==false&&currentTab!==id){const state=id==='recipes'?{rmpView:'home'}:{rmpView:'tab',tab:id,selectedCategory};history.pushState(state,'',location.href)}document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===id));document.querySelectorAll('.panel').forEach(p=>{p.classList.toggle('active',p.id===id);p.hidden=p.id!==id});if(id==='recipes')renderRecipes();if(id==='meat')renderMeat();if(id==='shopping')renderShop();requestAnimationFrame(()=>{window.scrollTo({top:0,behavior:'instant'});if(id==='add')$('rname').focus({preventScroll:true})})}
