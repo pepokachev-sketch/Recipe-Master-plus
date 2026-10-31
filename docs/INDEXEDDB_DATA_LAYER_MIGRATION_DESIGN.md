@@ -15,7 +15,7 @@ The application currently hydrates these four state collections synchronously fr
 
 persist() is synchronous and returns a boolean. It serializes all four collections, performs a 3.5 MiB preflight budget check, snapshots previous LocalStorage values, writes each key, and rolls back on failure. It also restores in-memory state from lastCommittedState and updates the UI. storageReadErrors blocks all writes.
 
-There are 22 textual persist() occurrences including the function declaration; 21 call sites. They are not interchangeable: some depend on the boolean synchronously, some need local rollback, and some run during startup migrations or import/restore flows.
+There are 23 textual persist() occurrences including the function declaration; 22 call sites. They are not interchangeable: some depend on the boolean synchronously, some need local rollback, and some run during startup migrations or import/restore flows.
 
 ## 2. Call-site inventory
 
