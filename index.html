@@ -692,6 +692,10 @@ const read=(key,fallback)=>{
   if(raw===null)return fallback;
   const value=JSON.parse(raw);
   if(!Array.isArray(value))throw new Error('invalid-storage-root');
+  if(value.some(item=>!item||typeof item!=='object'||Array.isArray(item)))throw new Error('invalid-storage-record');
+  if(key==='myrecipes_v1'&&value.some(item=>typeof item.name!=='string'||(item.ingredients!==undefined&&(!Array.isArray(item.ingredients)||item.ingredients.some(row=>!row||typeof row!=='object'||Array.isArray(row))))))throw new Error('invalid-recipe-record');
+  if(key==='myshop_v1'&&value.some(item=>typeof item.text!=='string'))throw new Error('invalid-shopping-record');
+  if(key==='myrecipes_customcats_v1'&&value.some(item=>typeof item.name!=='string'||!item.name.trim()))throw new Error('invalid-category-record');
   return value;
  }catch(error){
   storageReadErrors.push({key,raw,error:String(error)});
