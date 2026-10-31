@@ -684,6 +684,7 @@ body{padding-bottom:76px}
 <script>
 let categories=['Супи и чорби','Месни ястия','Ястия на фурна','Салати и предястия','Десерти','Зимнина и консервиране','Домашни колбаси и мезета','Сосове и маринати','Тестени изделия','Рецепти от механи и ресторанти','Други'];
 const $=id=>document.getElementById(id);
+const rmpBackupAdapterPromise=import('./src/backup-image-adapter.js');
 const storageReadErrors=[];
 const read=(key,fallback)=>{
  let raw=null;
@@ -1246,9 +1247,11 @@ async function downloadBackup(){
  }
  const exportRecipes=cloneState(recipes),exportCategories=cloneState(customCategories);
  try{
-  for(const r of exportRecipes)if(typeof r.img==='string'&&r.img.startsWith('idb:')){const data=await rmpImageGet(r.img.slice(4));if(!data)throw new Error('missing-recipe-image');r.img=data}
-  for(const c of exportCategories)if(typeof c.photo==='string'&&c.photo.startsWith('idb:')){const data=await rmpImageGet(c.photo.slice(4));if(!data)throw new Error('missing-category-image');c.photo=data}
- }catch(error){console.error('Recipe Master Plus: архивът не може да включи всички снимки',error);alert('Архивът не е създаден, защото една или повече снимки не могат да бъдат прочетени от IndexedDB. Данните не са променени.');return}
+  const adapter=await rmpBackupAdapterPromise;
+  const portable=await adapter.serializeBackupImages({recipes:exportRecipes,customCategories:exportCategories},rmpImageGet);
+  exportRecipes.splice(0,exportRecipes.length,...portable.recipes);
+  exportCategories.splice(0,exportCategories.length,...portable.customCategories);
+ }catch(error){console.error('Recipe Master Plus: архивът не може да включи всички снимки',error);alert('Архивът не е създаден, защото една или повече снимки не могат да бъдат прочетени или проверени. Данните не са променени.');return}
  const payload={app:'Recipe Master Plus',version:4,schemaVersion:2,recipes:exportRecipes,meatNotes,shopping,customCategories:exportCategories,exportedAt:new Date().toISOString()};
  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
  a.href=url;a.download='recipe-master-plus-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)
@@ -1278,18 +1281,35 @@ function readBackupFile(onValid){
  reader.onerror=()=>alert('Файлът не може да бъде прочетен.');
  reader.readAsText(f);
 }
-$('importData').onclick=()=>readBackupFile(d=>{
+$('importData').onclick=()=>readBackupFile(async d=>{
  if(!confirm(`Ще замениш ${recipes.length} рецепти, ${meatNotes.length} технологични бележки и ${shopping.length} продукта с данните от архива. Препоръчително е първо да изтеглиш резервно копие. Продължаваме ли?`))return;
- const oldCategories=[...categories];
- recipes=d.recipes;meatNotes=d.meatNotes||[];shopping=d.shopping||[];customCategories=d.customCategories||[];
- categories=[...categories.filter(c=>!lastCommittedState.customCategories.some(x=>x.name===c)),...customCategories.map(x=>x.name)];
- recipes.forEach(r=>{if(r.cat==='Пилешки ястия')r.cat='Месни ястия'});
- if(!persist()){categories=oldCategories;return}
- refreshCategoryOptions();renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
- alert('Данните са възстановени успешно.');
+ try{
+  const adapter=await rmpBackupAdapterPromise;
+  await adapter.restoreBackupImages(d,{
+   makeId:rmpNewImageId,
+   writeImage:async(id,dataUrl)=>{await rmpImagePut(id,dataUrl)},
+   readImage:rmpImageGet,
+   commitState:async restored=>{
+    recipes=restored.recipes;meatNotes=restored.meatNotes||[];shopping=restored.shopping||[];customCategories=restored.customCategories||[];
+    categories=[...categories.filter(c=>!lastCommittedState.customCategories.some(x=>x.name===c)),...customCategories.map(x=>x.name)];
+    recipes.forEach(r=>{if(r.cat==='Пилешки ястия')r.cat='Месни ястия'});
+    if(!persist())throw new Error('restore-state-persist-failed');
+   }
+  });
+  refreshCategoryOptions();renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
+  alert('Данните и снимките са възстановени и проверени успешно.');
+ }catch(error){console.error('Recipe Master Plus: възстановяването е прекратено',error);alert('Възстановяването не завърши. Текущите данни не бяха заменени. Възможно е да са останали временни снимки в хранилището, които не се използват.');}
 });
-$('mergeData').onclick=()=>readBackupFile(d=>{
- const keyRecipe=r=>String(r.id||'').trim()||`${String(r.name||'').trim().toLocaleLowerCase('bg')}|${String(r.cat||'').trim().toLocaleLowerCase('bg')}`;
+$('mergeData').onclick=()=>readBackupFile(async d=>{
+ try{
+  const adapter=await rmpBackupAdapterPromise;
+  await adapter.restoreBackupImages(d,{
+   makeId:rmpNewImageId,
+   writeImage:async(id,dataUrl)=>{await rmpImagePut(id,dataUrl)},
+   readImage:rmpImageGet,
+   commitState:async portable=>{
+    d=portable;
+    const keyRecipe=r=>String(r.id||'').trim()||`${String(r.name||'').trim().toLocaleLowerCase('bg')}|${String(r.cat||'').trim().toLocaleLowerCase('bg')}`;
  const keyGeneric=x=>String(x.id||'').trim()||JSON.stringify(x);
  const merge=(current,incoming,key)=>{const seen=new Set(current.map(key));let added=0;incoming.forEach(x=>{const k=key(x);if(!seen.has(k)){current.push(x);seen.add(k);added++}});return added};
  const nr=merge(recipes,d.recipes,keyRecipe),nm=merge(meatNotes,d.meatNotes||[],keyGeneric),ns=merge(shopping,d.shopping||[],x=>String(x.text||'').trim().toLocaleLowerCase('bg'));
@@ -1297,6 +1317,9 @@ $('mergeData').onclick=()=>readBackupFile(d=>{
  if(!persist())throw new Error('merge-state-persist-failed');
  refreshCategoryOptions();renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
  alert(`Обединяването завърши. Добавени: ${nr} рецепти, ${nm} бележки и ${ns} продукта. Съществуващите дубликати са пропуснати.`);
+   }
+  });
+ }catch(error){console.error('Recipe Master Plus: обединяването е прекратено',error);alert('Обединяването не завърши, защото снимките не можаха да бъдат възстановени и проверени.');}
 });
 let tfInterval=null,tfEnd=0,tfRemaining=0,tfRunning=false,tfAlarmInterval=null,tfAudio=null;
 const tf=$('floatingTimer');
