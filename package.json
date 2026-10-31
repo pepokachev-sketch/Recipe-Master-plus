@@ -1,0 +1,8 @@
+{
+  "name": "recipe-master-plus",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:data-manager": "node --test tests/indexeddb-data-manager.test.js"
+  }
+}
