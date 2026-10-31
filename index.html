@@ -1212,7 +1212,7 @@ $('addShop').onclick=()=>{let v=$('shopInput').value.trim();if(v){shopping.push(
 function toggleShop(id){shopping=shopping.map(s=>s.id===id?{...s,done:!s.done}:s);if(!persist())return;renderShop()}function deleteShop(id){shopping=shopping.filter(s=>s.id!==id);if(!persist())return;renderShop()}
 $('clearDone').onclick=()=>{shopping=shopping.filter(s=>!s.done);if(!persist())return;renderShop()};
 $('clearShop').onclick=()=>{if(confirm('Да изчистя ли целия списък?')){shopping=[];if(!persist())return;renderShop()}};
-function downloadBackup(){
+async function downloadBackup(){
  if(storageReadErrors.length){
   const recovery={app:'Recipe Master Plus Recovery',version:1,exportedAt:new Date().toISOString(),warning:'Това е диагностично копие на невалидните или недостъпни локални записи. Не го импортирай като стандартен архив.',storageReadErrors:storageReadErrors.map(item=>({key:item.key,raw:item.raw,error:item.error}))};
   const blob=new Blob([JSON.stringify(recovery,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
