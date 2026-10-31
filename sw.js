@@ -50,6 +50,23 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Network-first for the central recipe library, with an offline cache fallback.
+  if (url.pathname.endsWith('/recipes_library.json')) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME);
+      try {
+        const response = await fetch(request);
+        if (response && response.ok) await cache.put(request, response.clone());
+        return response;
+      } catch (error) {
+        return (await cache.match(request)) || new Response('Централната библиотека не е налична офлайн.', {
+          status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      }
+    })());
+    return;
+  }
+
   // Keep same-origin application resources available after the first successful load.
   if (url.pathname.startsWith(APP_ROOT.pathname)) {
     event.respondWith((async () => {
