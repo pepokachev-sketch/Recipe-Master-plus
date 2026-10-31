@@ -178,3 +178,73 @@ test('rejects a failed readwrite transaction and leaves previous committed state
   await assert.rejects(manager.commitState(attempted));
   assert.deepEqual(await manager.loadState(), original);
 });
+
+
+test('accepts real legacy custom categories without synthetic IDs', async () => {
+  const legacy = memoryStorage({
+    myrecipes_v1: JSON.stringify([{ id: 'r1', name: 'Soup', img: 'idb:img-existing-1' }]),
+    mymeat_v1: JSON.stringify([]),
+    myshop_v1: JSON.stringify([]),
+    myrecipes_customcats_v1: JSON.stringify([
+      { name: 'Домашни рецепти', description: 'Лични', photo: 'idb:img-category-1' }
+    ])
+  });
+  const manager = new RecipeMasterDataManager({ indexedDB, dbName: 'rmp-legacy-categories-' + crypto.randomUUID() });
+  const result = await manager.initializeFromLegacy(legacy);
+  assert.equal(result.status, 'migrated');
+  assert.deepEqual(result.state.customCategories, [
+    { name: 'Домашни рецепти', description: 'Лични', photo: 'idb:img-category-1' }
+  ]);
+  assert.equal(result.state.recipes[0].img, 'idb:img-existing-1');
+});
+
+test('preserves image references as opaque strings in recipe and category records', async () => {
+  const manager = new RecipeMasterDataManager({ indexedDB, dbName: 'rmp-image-refs-' + crypto.randomUUID() });
+  const state = {
+    recipes: [{ id: 'r1', name: 'Soup', img: 'idb:img-abc123' }],
+    meatNotes: [],
+    shopping: [],
+    customCategories: [{ name: 'Супи', photo: 'idb:img-cat123' }]
+  };
+  await manager.initializeFromLegacy(memoryStorage({
+    myrecipes_v1: JSON.stringify(state.recipes),
+    mymeat_v1: '[]',
+    myshop_v1: '[]',
+    myrecipes_customcats_v1: JSON.stringify(state.customCategories)
+  }));
+  assert.deepEqual(await manager.loadState(), state);
+});
+
+test('concurrent migration attempts from two managers cannot overwrite a completed migration', async () => {
+  const dbName = 'rmp-migration-race-' + crypto.randomUUID();
+  const firstState = {
+    recipes: [{ id: 'first', name: 'First' }],
+    meatNotes: [],
+    shopping: [],
+    customCategories: [{ name: 'Първа категория' }]
+  };
+  const secondState = {
+    recipes: [{ id: 'second', name: 'Second' }],
+    meatNotes: [],
+    shopping: [],
+    customCategories: [{ name: 'Втора категория' }]
+  };
+  const storageFor = state => memoryStorage({
+    myrecipes_v1: JSON.stringify(state.recipes),
+    mymeat_v1: JSON.stringify(state.meatNotes),
+    myshop_v1: JSON.stringify(state.shopping),
+    myrecipes_customcats_v1: JSON.stringify(state.customCategories)
+  });
+  const first = new RecipeMasterDataManager({ indexedDB, dbName });
+  const second = new RecipeMasterDataManager({ indexedDB, dbName });
+  const results = await Promise.all([
+    first.initializeFromLegacy(storageFor(firstState)),
+    second.initializeFromLegacy(storageFor(secondState))
+  ]);
+  const finalState = await first.loadState();
+  const isFirst = JSON.stringify(finalState) === JSON.stringify(validateState(firstState));
+  const isSecond = JSON.stringify(finalState) === JSON.stringify(validateState(secondState));
+  assert.equal(isFirst || isSecond, true);
+  assert.equal(results.filter(x => x.status === 'migrated').length, 1);
+  assert.equal(results.filter(x => x.status === 'already-initialized').length, 1);
+});
