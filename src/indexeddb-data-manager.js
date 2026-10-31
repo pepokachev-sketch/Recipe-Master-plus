@@ -71,7 +71,24 @@ export function validateState(input) {
   return state;
 }
 
-export function parseLegacyState(storage) {
+export function normalizeLegacyRecordIds(state) {
+  const prefixes = { recipes: 'recipe', meatNotes: 'note', shopping: 'shop' };
+  Object.entries(prefixes).forEach(([collection, prefix]) => {
+    const seen = new Set();
+    state[collection].forEach((record, index) => {
+      let id = String(record.id ?? '');
+      if (!/^[A-Za-z0-9._:-]{1,100}$/.test(id) || seen.has(id)) {
+        id = prefix + '-migrated-' + index.toString(36);
+        while (seen.has(id)) id += 'x';
+        record.id = id;
+      }
+      seen.add(id);
+    });
+  });
+  return state;
+}
+
+function parseLegacyState(storage) {
   if (!storage || typeof storage.getItem !== 'function') {
     throw new TypeError('legacy-storage-unavailable');
   }
@@ -90,6 +107,9 @@ export function parseLegacyState(storage) {
     }
     state[name] = parsed;
   });
+  // Match the running application's startup normalization before validating.
+  // This changes only the in-memory migration snapshot; LocalStorage is untouched.
+  normalizeLegacyRecordIds(state);
   return validateState(state);
 }
 
