@@ -102,7 +102,7 @@ export function normalizeLegacyRecordIds(state) {
   return state;
 }
 
-function parseLegacyState(storage) {
+export function parseLegacyState(storage) {
   if (!storage || typeof storage.getItem !== 'function') {
     throw new TypeError('legacy-storage-unavailable');
   }
