@@ -1294,7 +1294,7 @@ $('mergeData').onclick=()=>readBackupFile(d=>{
  const merge=(current,incoming,key)=>{const seen=new Set(current.map(key));let added=0;incoming.forEach(x=>{const k=key(x);if(!seen.has(k)){current.push(x);seen.add(k);added++}});return added};
  const nr=merge(recipes,d.recipes,keyRecipe),nm=merge(meatNotes,d.meatNotes||[],keyGeneric),ns=merge(shopping,d.shopping||[],x=>String(x.text||'').trim().toLocaleLowerCase('bg'));
  if(Array.isArray(d.customCategories)){const categoryKey=c=>String(c?.name??'').normalize('NFC').trim().toLocaleLowerCase('bg');const known=new Set(customCategories.map(categoryKey));d.customCategories.forEach(c=>{const key=categoryKey(c);if(c&&key&&!known.has(key)){customCategories.push(c);categories.push(c.name);known.add(key)}})}
- if(!persist())return;
+ if(!persist())throw new Error('merge-state-persist-failed');
  refreshCategoryOptions();renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
  alert(`Обединяването завърши. Добавени: ${nr} рецепти, ${nm} бележки и ${ns} продукта. Съществуващите дубликати са пропуснати.`);
 });
