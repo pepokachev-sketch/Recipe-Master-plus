@@ -1,9 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
 <title id="title">Odin wolf</title>
-<defs><linearGradient id="ring" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffbd42"/><stop offset="1" stop-color="#ff7900"/></linearGradient><linearGradient id="fur" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#aeb4bd"/></linearGradient></defs>
-<path d="M24 91A49 49 0 1 1 103 25" fill="none" stroke="url(#ring)" stroke-width="8" stroke-linecap="round"/>
-<path d="M28 103 39 77 35 47 57 61 75 43 92 15 98 51 116 65 99 76 91 105 75 91 60 116 51 91Z" fill="url(#fur)" stroke="#f5f6f8" stroke-width="2" stroke-linejoin="round"/>
-<path d="m40 50 17 11-13 2Z" fill="#15171b"/><path d="m77 47 14-19 2 24-10 12Z" fill="#252a32"/>
-<path d="M61 70q12-12 25-8-8 12-25 8Z" fill="#11151c"/><path d="M66 67q8-7 15-5-7 7-15 5Z" fill="#22aaff"/>
-<path d="m99 75 14-10-7 17-13 8Z" fill="#fff"/><path d="m52 91 9 25 10-22-8 8Z" fill="#8f969f"/>
+<defs>
+  <linearGradient id="fur" x1="18" y1="12" x2="104" y2="112" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#fff"/><stop offset=".55" stop-color="#d9dde3"/><stop offset="1" stop-color="#858e9b"/>
+  </linearGradient>
+  <linearGradient id="ember" x1="18" y1="20" x2="105" y2="105" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#ffd36a"/><stop offset="1" stop-color="#f47721"/>
+  </linearGradient>
+</defs>
+<circle cx="64" cy="64" r="57" fill="#171c25"/>
+<path d="M19 43 31 12 53 32Q68 22 83 30L105 9 108 47Q119 62 111 80L92 106 72 116 56 103 39 109 43 91Q25 80 19 43Z" fill="url(#fur)" stroke="#f7f8fa" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="m31 17 18 20-17-2Z" fill="#343c48"/>
+<path d="m88 31 14-15-1 31-13-8Z" fill="#343c48"/>
+<path d="M45 51Q60 39 78 48Q66 57 45 55Z" fill="#222a35"/>
+<path d="M51 51Q64 44 75 49Q65 53 51 53Z" fill="#36b8ff"/>
+<path d="M53 51Q65 47 73 49" fill="none" stroke="#d9f5ff" stroke-width="1.8" stroke-linecap="round"/>
+<path d="M79 57Q91 60 103 70L115 72 104 82Q88 83 75 72Z" fill="#f3f4f6"/>
+<path d="m102 70 13 2-10 7-8-2Z" fill="#202630"/>
+<path d="M49 75Q62 84 79 77Q70 94 53 91Z" fill="#a0a8b3"/>
+<path d="M29 69Q34 87 51 94L42 103Q24 91 21 68Z" fill="#f7f8fa"/>
+<path d="M18 43Q26 29 39 25" fill="none" stroke="url(#ember)" stroke-width="5" stroke-linecap="round"/>
+<path d="M31 100Q43 113 58 116" fill="none" stroke="url(#ember)" stroke-width="4" stroke-linecap="round"/>
+<path d="m61 94 11 12 9-13" fill="none" stroke="#737d8b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
