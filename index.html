@@ -1278,4 +1278,15 @@ renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
 </script>
 <!-- Recipe Master Plus V17.5: primary ingredient scaling in editor, detail view and desktop preview -->
 <!-- Recipe Master Plus V16.5: category selector in recipe detail -->
+
+<script>
+// Офлайн режим: кешира се приложението след първото успешно зареждане през HTTPS.
+if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){
+ window.addEventListener('load',()=>{
+  navigator.serviceWorker.register('./sw.js',{scope:'./'})
+   .then(reg=>console.info('Recipe Master Plus: офлайн кешът е активиран',reg.scope))
+   .catch(error=>console.warn('Recipe Master Plus: офлайн кешът не може да бъде активиран',error));
+ });
+}
+</script>
 </body></html>
