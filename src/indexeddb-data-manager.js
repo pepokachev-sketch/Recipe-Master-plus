@@ -195,10 +195,12 @@ export class RecipeMasterDataManager {
 
     // A readwrite transaction serializes initialization across tabs. The marker
     // is checked inside that transaction, not in a preceding readonly request.
+    let didMigrate = false;
     const markerRequest = metaStore.get('state');
     markerRequest.onsuccess = () => {
       const existing = markerRequest.result;
       if (existing?.authoritative === true) return;
+      didMigrate = true;
       COLLECTIONS.forEach(name => {
         appStore.put({ key: name, value: legacyState[name] });
       });
@@ -225,7 +227,7 @@ export class RecipeMasterDataManager {
       });
     }
     return {
-      status: verifiedMeta?.migration === 'localstorage-v1' ? 'migrated-or-already-migrated' : 'already-initialized',
+      status: didMigrate ? 'migrated' : 'already-initialized',
       state: verified,
       counts: verifiedMeta?.counts || counts
     };
