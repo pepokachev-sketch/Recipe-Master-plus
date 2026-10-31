@@ -248,3 +248,73 @@ test('concurrent migration attempts from two managers cannot overwrite a complet
   assert.equal(results.filter(x => x.status === 'migrated').length, 1);
   assert.equal(results.filter(x => x.status === 'already-initialized').length, 1);
 });
+
+
+test('keeps the image database separate while state commits preserve image pointers', async () => {
+  const dataDbName = 'rmp-data-image-separation-' + crypto.randomUUID();
+  const imageDbName = 'recipe-master-plus-images';
+  const manager = new RecipeMasterDataManager({ indexedDB, dbName: dataDbName });
+  const imageOpen = indexedDB.open(imageDbName, 1);
+  imageOpen.onupgradeneeded = () => imageOpen.result.createObjectStore('images', { keyPath: 'id' });
+  const imageDb = await new Promise((resolve, reject) => {
+    imageOpen.onsuccess = () => resolve(imageOpen.result);
+    imageOpen.onerror = () => reject(imageOpen.error);
+  });
+  const imageBlob = new Blob(['image-bytes'], { type: 'image/png' });
+  await new Promise((resolve, reject) => {
+    const tx = imageDb.transaction('images', 'readwrite');
+    tx.objectStore('images').put({
+      id: 'img-independent',
+      blob: imageBlob,
+      mimeType: 'image/png',
+      size: imageBlob.size
+    });
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+
+  const state = {
+    recipes: [{ id: 'r1', name: 'Soup', img: 'idb:img-independent' }],
+    meatNotes: [],
+    shopping: [],
+    customCategories: [{ name: 'Супи', photo: 'idb:img-independent' }]
+  };
+  await manager.initializeFromLegacy(memoryStorage({
+    myrecipes_v1: JSON.stringify(state.recipes),
+    mymeat_v1: '[]',
+    myshop_v1: '[]',
+    myrecipes_customcats_v1: JSON.stringify(state.customCategories)
+  }));
+  const changed = structuredClone(state);
+  changed.recipes[0].notes = 'updated';
+  await manager.commitState(changed);
+
+  const persistedImage = await new Promise((resolve, reject) => {
+    const tx = imageDb.transaction('images', 'readonly');
+    const request = tx.objectStore('images').get('img-independent');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  assert.equal(persistedImage.blob.size, imageBlob.size);
+  assert.equal(persistedImage.blob.type, 'image/png');
+  assert.deepEqual((await manager.loadState()).recipes[0].img, 'idb:img-independent');
+
+  const dataDb = await manager.open();
+  assert.deepEqual(Array.from(dataDb.objectStoreNames).sort(), ['appState', 'metadata']);
+  assert.equal(dataDb.objectStoreNames.contains('images'), false);
+  imageDb.close();
+  dataDb.close();
+});
+
+test('legacy image data URLs remain data URLs during migration and are not mistaken for IndexedDB pointers', async () => {
+  const dataUrl = 'data:image/png;base64,aGVsbG8=';
+  const manager = new RecipeMasterDataManager({ indexedDB, dbName: 'rmp-legacy-dataurl-' + crypto.randomUUID() });
+  const result = await manager.initializeFromLegacy(memoryStorage({
+    myrecipes_v1: JSON.stringify([{ id: 'r1', name: 'Soup', img: dataUrl }]),
+    mymeat_v1: '[]',
+    myshop_v1: '[]',
+    myrecipes_customcats_v1: '[]'
+  }));
+  assert.equal(result.state.recipes[0].img, dataUrl);
+});
