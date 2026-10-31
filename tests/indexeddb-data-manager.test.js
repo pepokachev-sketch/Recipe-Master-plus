@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseLegacyState, validateState, DATA_MANAGER_SCHEMA } from './indexeddb-data-manager.js';
+import { parseLegacyState, validateState, DATA_MANAGER_SCHEMA } from '../src/indexeddb-data-manager.js';
 
 const validState = () => ({
   recipes: [{ id: 'r1', name: 'Soup' }],
