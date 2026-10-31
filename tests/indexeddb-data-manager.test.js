@@ -53,6 +53,26 @@ test('parses legacy LocalStorage and treats absent keys as empty arrays', () => 
   assert.equal(state.customCategories.length, 0);
 });
 
+test('normalizes missing, invalid and duplicate legacy IDs in the migration snapshot', () => {
+  const values = new Map([
+    ['myrecipes_v1', JSON.stringify([{ name: 'Old recipe' }, { id: 'same', name: 'First' }, { id: 'same', name: 'Duplicate' }])],
+    ['mymeat_v1', JSON.stringify([{ name: 'Old note' }])],
+    ['myshop_v1', JSON.stringify([{ text: 'Salt' }, { id: 'bad id', text: 'Pepper' }])]
+  ]);
+  const storage = { getItem: key => values.has(key) ? values.get(key) : null };
+  const before = Object.fromEntries(values);
+  const state = parseLegacyState(storage);
+
+  for (const collection of ['recipes', 'meatNotes', 'shopping']) {
+    const ids = state[collection].map(record => record.id);
+    assert.ok(ids.every(id => /^[A-Za-z0-9._:-]{1,100}$/.test(id)));
+    assert.equal(new Set(ids).size, ids.length);
+  }
+  assert.equal(state.recipes[1].id, 'same');
+  assert.notEqual(state.recipes[2].id, 'same');
+  assert.deepEqual(Object.fromEntries(values), before);
+});
+
 test('rejects invalid legacy JSON and invalid legacy collection shape', () => {
   const invalidJson = { getItem: key => key === 'myrecipes_v1' ? '{bad' : null };
   assert.throws(() => parseLegacyState(invalidJson), /legacy-json-invalid/);
