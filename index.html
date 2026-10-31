@@ -709,7 +709,20 @@ let lastCommittedState={recipes:cloneState(recipes),meatNotes:cloneState(meatNot
 function persist(){
  if(storageReadErrors.length){
   const keys=storageReadErrors.map(item=>item.key).join(', ');
-  alert('Открити са повредени или недостъпни локални данни ('+keys+'). Записването е блокирано, за да не бъдат презаписани. Не изчиствай данните на браузъра. Възстанови ги от резервно копие или потърси помощ за възстановяване.');
+  recipes=cloneState(lastCommittedState.recipes);
+  meatNotes=cloneState(lastCommittedState.meatNotes);
+  shopping=cloneState(lastCommittedState.shopping);
+  customCategories=cloneState(lastCommittedState.customCategories);
+  categories=[...lastCommittedState.categories];
+  if(activeRecipe)activeRecipe=recipes.find(r=>r.id===activeRecipe.id)||null;
+  try{
+   if($('recipeCount'))renderRecipes();
+   if($('meatList'))renderMeat();
+   if($('shopList'))renderShop();
+   if($('customCategoryList'))renderCustomCategoryList();
+   if(activeRecipe&&$('detailDialog')?.open)renderRecipeDetail();
+  }catch(renderError){console.error('Recipe Master Plus: грешка при възстановяване след блокиран запис',renderError)}
+  alert('Открити са повредени или недостъпни локални данни ('+keys+'). Записването е блокирано, за да не бъдат презаписани. Промените в текущата операция са отменени и приложението е върнато към последното успешно запазено състояние. Не изчиствай данните на браузъра. Възстанови ги от резервно копие или потърси помощ за възстановяване.');
   return false;
  }
  const keys=['myrecipes_v1','mymeat_v1','myshop_v1','myrecipes_customcats_v1'];
