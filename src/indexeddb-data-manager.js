@@ -77,6 +77,14 @@ export function normalizeLegacyRecordIds(state) {
     if (!Array.isArray(state[collection])) {
       throw new TypeError('invalid-collection:' + collection);
     }
+    // Reserve every valid legacy ID before generating replacements. Otherwise a
+    // generated ID for an early record could steal a valid ID from a later record.
+    const reserved = new Set(
+      state[collection]
+        .filter(record => record && typeof record === 'object' && !Array.isArray(record))
+        .map(record => String(record.id ?? ''))
+        .filter(id => /^[A-Za-z0-9._:-]{1,100}$/.test(id))
+    );
     const seen = new Set();
     state[collection].forEach((record, index) => {
       if (!record || typeof record !== 'object' || Array.isArray(record)) {
@@ -85,7 +93,7 @@ export function normalizeLegacyRecordIds(state) {
       let id = String(record.id ?? '');
       if (!/^[A-Za-z0-9._:-]{1,100}$/.test(id) || seen.has(id)) {
         id = prefix + '-migrated-' + index.toString(36);
-        while (seen.has(id)) id += 'x';
+        while (seen.has(id) || reserved.has(id)) id += 'x';
         record.id = id;
       }
       seen.add(id);
