@@ -757,6 +757,20 @@ function persist(){
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function safeUrl(value){try{const u=new URL(value);return ['http:','https:'].includes(u.protocol)?u.href:''}catch{return ''}}
 
+// Валидира снимките, без да допуска произволни схеми или HTML.
+// idb: препратките се показват само след като изображението е заредено в IndexedDB.
+function safeImageUrl(value){
+ if(typeof value!=='string')return '';
+ const source=value.trim();
+ if(!source)return '';
+ if(source.startsWith('idb:')){
+  const id=source.slice(4);
+  return /^[A-Za-z0-9._:-]{1,100}$/.test(id)?(rmpImageUrls.get(id)||''):'';
+ }
+ if(/^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(source))return source;
+ return safeUrl(source);
+}
+
 // Локално хранилище за изображения. Старите Base64 изображения се мигрират
 // само след запис и проверка в IndexedDB; оригиналите остават при неуспех.
 const rmpImageUrls=new Map();
