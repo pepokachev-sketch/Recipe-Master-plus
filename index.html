@@ -732,7 +732,7 @@ function persist(){
  const keys=['myrecipes_v1','mymeat_v1','myshop_v1','myrecipes_customcats_v1'];
  let previous=null;
  try{
-  const values=[JSON.stringify(recipes),JSON.stringify(meatNotes),JSON.stringify(shopping),JSON.stringify(customCategories)];
+  const values=[JSON.stringify(recipes.filter(r=>!r.librarySource)),JSON.stringify(meatNotes),JSON.stringify(shopping),JSON.stringify(customCategories)];
   previous=keys.map(k=>localStorage.getItem(k));
   const nextStorageUnits=values.reduce((total,value)=>total+value.length,0);
   const currentStorageUnits=previous.reduce((total,value)=>total+(value===null?0:value.length),0);
@@ -897,7 +897,7 @@ function renderDesktopPreview(){
   ${scaleControls}
   <div class="preview-tabs"><button class="${previewTab==='ingredients'?'active':''}" onclick="previewTab='ingredients';renderDesktopPreview()">Продукти</button><button class="${previewTab==='steps'?'active':''}" onclick="previewTab='steps';renderDesktopPreview()">Стъпки</button><button class="${previewTab==='notes'?'active':''}" onclick="previewTab='notes';renderDesktopPreview()">Бележки</button><button class="${previewTab==='timer'?'active':''}" onclick="previewTab='timer';renderDesktopPreview()">Таймер</button></div>
   ${body}
-  <div class="preview-actions"><button class="btn secondary" onclick="addRecipeToShopping('${esc(r.id)}')">🛒 Добави в пазаруването</button><button class="btn" onclick="openRecipe('${esc(r.id)}')">▶ Готвя сега</button><button class="btn secondary" onclick="editRecipe('${esc(r.id)}')">✎ Редактирай</button></div>
+  <div class="preview-actions"><button class="btn secondary" onclick="addRecipeToShopping('${esc(r.id)}')">🛒 Добави в пазаруването</button><button class="btn" onclick="openRecipe('${esc(r.id)}')">▶ Готвя сега</button>${r.librarySource?'':`<button class="btn secondary" onclick="editRecipe('${esc(r.id)}')">✎ Редактирай</button>`}</div>
  </div>`;
 }
 function addRecipeToShopping(id){
@@ -940,7 +940,7 @@ function renderRecipes(){
   return `<article class="recipe recipe-list-item" data-open="${esc(r.id)}" role="button" tabindex="0" aria-label="Отвори рецептата ${esc(r.name)}">
    ${img?`<img class="recipe-thumb" src="${esc(img)}" alt="" onerror="this.style.display='none'">`:catPhoto?`<div class="recipe-thumb recipe-thumb-photo" style="background-image:url('${catPhoto}')"></div>`:`<div class="recipe-thumb recipe-thumb-empty">${categoryIcons[r.cat]||'🍽️'}</div>`}
    <div class="recipe-list-main"><div class="recipe-top"><div class="recipe-list-title"><h3>${esc(r.name)}</h3><span class="tag">${esc(r.cat||'Други')}</span></div>
-   <div class="recipe-row-actions"><button class="row-edit" title="Редактирай рецептата" aria-label="Редактирай рецептата" onclick="event.stopPropagation();editRecipe('${esc(r.id)}')">✎</button><button class="row-delete" title="Изтрий рецептата" aria-label="Изтрий рецептата" onclick="event.stopPropagation();deleteRecipe('${esc(r.id)}')">🗑</button><button class="favorite ${r.favorite?'on':''}" title="Любима рецепта" aria-label="Любима рецепта" onclick="event.stopPropagation();toggleFavorite('${esc(r.id)}')">${r.favorite?'★':'☆'}</button></div></div>
+   <div class="recipe-row-actions"><button class="row-edit" title="Редактирай рецептата" aria-label="Редактирай рецептата" ${r.librarySource?'':`<button class="row-edit" title="Редактирай рецептата" aria-label="Редактирай рецептата" onclick="event.stopPropagation();editRecipe('${esc(r.id)}')">✎</button><button class="row-delete" title="Изтрий рецептата" aria-label="Изтрий рецептата" onclick="event.stopPropagation();deleteRecipe('${esc(r.id)}')">🗑</button>`}<button class="favorite ${r.favorite?'on':''}" title="Любима рецепта" aria-label="Любима рецепта" onclick="event.stopPropagation();toggleFavorite('${esc(r.id)}')">${r.favorite?'★':'☆'}</button></div></div>
    <div class="recipe-list-meta">${count?`<span>▤ ${count} продукта</span>`:''}${r.serv?`<span>♟ ${esc(r.serv)} порции</span>`:''}${r.time?`<span>◷ ${esc(r.time)} мин</span>`:''}</div>${(Array.isArray(r.tags)?r.tags:[]).length?`<div class="recipe-tags">${r.tags.map(t=>`<span class="tag recipe-tag">${esc(t)}</span>`).join('')}</div>`:''}</div><span class="recipe-chevron">›</span></article>`;
  }).join(''):'<div class="empty"><div style="font-size:34px">📖</div><b>Няма рецепти</b>Добави рецепта или избери друга категория.</div>';
  if(window.matchMedia('(min-width:701px)').matches){
@@ -1016,7 +1016,7 @@ $('editorScaleMode')?.addEventListener('change',e=>{editorCurrentMode=e.target.v
 $('editorScaleTarget')?.addEventListener('input',()=>{if($('editorScaleMode')?.value==='servings')$('rserv').value=$('editorScaleTarget').value;updateIngredientEditorPreview()});
 $('rserv')?.addEventListener('input',()=>{if($('editorScaleMode')?.value==='servings'){$('editorScaleTarget').value=$('rserv').value;updateIngredientEditorPreview()}});
 function ingredientLinesFromRows(rows){return normalizeIngredientRows(rows).map(x=>ingredientText(x,1)).filter(Boolean).join('\n')}
-function toggleFavorite(id){const r=recipes.find(x=>x.id===id);if(r){r.favorite=!r.favorite;if(!persist())return;renderRecipes()}}
+function toggleFavorite(id){const r=recipes.find(x=>x.id===id);if(r){r.favorite=!r.favorite;if(r.librarySource){try{const ids=JSON.parse(localStorage.getItem('rmp_central_favorites_v1')||'[]');const set=new Set(Array.isArray(ids)?ids:[]);r.favorite?set.add(String(r.id)):set.delete(String(r.id));localStorage.setItem('rmp_central_favorites_v1',JSON.stringify([...set]))}catch(error){console.warn('Централните любими не можаха да се запазят',error)}}else if(!persist())return;renderRecipes()}}
 function ingredientLines(v){return String(v||'').split(/\n/).map(x=>x.trim()).filter(Boolean)}
 function scaleLine(line,factor){
  const m=line.match(/^(\s*)(\d+(?:[.,]\d+)?|\d+\/\d+)(?=\s|$)/);
@@ -1040,7 +1040,7 @@ function bindRecipePhotoControls(r){
 }
 function refreshRecipePhotoArea(r){const area=$('detailPhotoArea');if(area&&activeRecipe?.id===r.id)area.innerHTML=recipePhotoMarkup(r);bindRecipePhotoControls(r)}
 async function saveUploadedRecipePhoto(r,file){
- if(!r||activeRecipe?.id!==r.id)return;
+ if(!r||activeRecipe?.id!==r.id)return;if(r.librarySource){alert('Снимките към централните рецепти се управляват от централната библиотека.');return;}
  if(!file.type||!file.type.startsWith('image/')){alert('Моля, избери файл със снимка.');return}
  if(file.size>15*1024*1024){alert('Снимката е твърде голяма. Избери файл до 15 MB.');return}
  try{
@@ -1176,7 +1176,7 @@ $('expandedEditCancel').onclick=()=>{$('expandedEditDialog').close();expandedTar
 $('expandedEditDialog').addEventListener('cancel',e=>{e.preventDefault();$('expandedEditDialog').close();expandedTarget=null});
 $('expandedEditDialog').addEventListener('click',e=>{if(e.target===$('expandedEditDialog')){$('expandedEditDialog').close();expandedTarget=null}});
 function resetForm(){$('editId').value='';$('formTitle').textContent='Добави рецепта';$('saveRecipe').textContent='Запази рецептата';$('cancelEdit').classList.add('hidden');['rname','rtags','rurl','rimg','ring','rsteps','rtime','rtemp','rnotes'].forEach(id=>{$(id).value='';$(id).readOnly=false;$(id).classList.remove('edit-expand-field')});renderIngredientEditor([{amount:'',unit:'',name:'',scale:true}]);$('ringHint').hidden=true;$('stepsHint').hidden=true;$('rserv').value=4;$('rcat').selectedIndex=0;editorBaselineRows=[];editorBaselineServings=4;editorCurrentMode='servings';if($('editorScaleMode'))$('editorScaleMode').value='servings';if($('editorScaleTarget')){$('editorScaleTarget').value=4;$('editorScaleTarget').disabled=false}updateIngredientEditorPreview()}
-function editRecipe(id){const r=recipes.find(x=>x.id===id);if(!r)return;
+function editRecipe(id){const r=recipes.find(x=>x.id===id);if(!r)return;if(r.librarySource){alert('Тази рецепта е от централната библиотека. За да запазим общата версия последователна, редактирането ѝ се прави през библиотеката.');return;}
  // Give the edit screen its own history entry so Android Back stays in the app.
  history.pushState({rmpView:'edit'},'',location.href);
  switchTab('add');$('editId').value=r.id;$('formTitle').textContent='Редактирай рецепта';$('saveRecipe').textContent='Запази промените';$('cancelEdit').classList.remove('hidden');$('rname').value=r.name||'';$('rtags').value=Array.isArray(r.tags)?r.tags.join(', '):(r.tags||'');$('rcat').value=r.cat||categories[0];$('rserv').value=r.serv||1;$('rurl').value=r.url||'';$('rimg').value=r.img||'';const ingredientRows=getRecipeIngredients(r);editorBaselineRows=JSON.parse(JSON.stringify(ingredientRows));editorBaselineServings=Math.max(1,Number(r.serv)||1);editorCurrentMode='servings';$('editorScaleMode').value='servings';$('editorScaleTarget').value=editorBaselineServings;renderIngredientEditor(ingredientRows.length?ingredientRows:[{id:'ing_new',amount:'',unit:'',name:'',scale:true,base:false,scaleBase:true}]);$('ring').value=r.ing||'';$('rsteps').value=r.steps||'';$('rtime').value=r.time||'';$('rtemp').value=r.temp||'';$('rnotes').value=r.notes||'';
@@ -1195,7 +1195,7 @@ $('saveRecipe').onclick=()=>{
  const previousRecipes=recipes.slice(),oldId=$('editId').value;
  const data={id:oldId||Date.now().toString(),created:oldId?(recipes.find(r=>r.id===oldId)?.created||Date.now()):Date.now(),name,tags:[...new Set($('rtags').value.split(/[,;\n]/).map(t=>t.trim()).filter(Boolean))],cat:$('rcat').value,serv:Math.max(1,Number($('rserv').value)||1),url:$('rurl').value.trim(),img:$('rimg').value.trim(),ingredients:editorRows,ing:ingredientLinesFromRows(editorRows),steps:$('rsteps').value.trim(),time:$('rtime').value,temp:$('rtemp').value,notes:$('rnotes').value.trim(),favorite:oldId?!!recipes.find(r=>r.id===oldId)?.favorite:false};
  if(oldId)recipes=recipes.map(r=>r.id===oldId?data:r);else recipes.unshift(data);if(!persist()){recipes=previousRecipes;return}const savedCategory=data.cat;selectedCategory=savedCategory;if(history.state?.rmpView==='edit')history.replaceState({rmpView:savedCategory?'category':'home'},'',location.href);resetForm();switchTab('recipes',{preserveCategory:true})};
-function deleteRecipe(id){const existing=recipes.find(r=>r.id===id);if(!existing)return false;if(!confirm(`Сигурен ли си, че искаш да изтриеш рецептата „${existing.name}“? Това действие не може да бъде отменено.`))return false;const previousRecipes=recipes;recipes=recipes.filter(r=>r.id!==id);if(!persist()){recipes=previousRecipes;return false}if(activeRecipe?.id===id){if($('detailDialog').open)$('detailDialog').close();activeRecipe=null;if(history.state?.rmpView==='recipe')history.back()}renderRecipes();return true}
+function deleteRecipe(id){const existing=recipes.find(r=>r.id===id);if(!existing)return false;if(existing.librarySource){alert('Тази рецепта е от централната библиотека и не може да бъде изтрита от локалния списък.');return false;}if(!confirm(`Сигурен ли си, че искаш да изтриеш рецептата „${existing.name}“? Това действие не може да бъде отменено.`))return false;const previousRecipes=recipes;recipes=recipes.filter(r=>r.id!==id);if(!persist()){recipes=previousRecipes;return false}if(activeRecipe?.id===id){if($('detailDialog').open)$('detailDialog').close();activeRecipe=null;if(history.state?.rmpView==='recipe')history.back()}renderRecipes();return true}
 $('search').oninput=renderRecipes;$('sort').onchange=renderRecipes;$('favoritesOnly').onchange=renderRecipes;$('tagFilter').onchange=renderRecipes;
 const density={flour:.53,sugar:.85,powderSugar:.5,salt:1.2,rice:.85,oil:.92,water:1,butter:.96,honey:1.42};
 const gramsPerTbsp={flour:8,sugar:12.5,powderSugar:7.5,salt:18,rice:12.5,oil:13.8,water:15,butter:14.4,honey:21.3};
@@ -1354,9 +1354,34 @@ gs.addEventListener('input',globalSearchRender);$('globalSearchClear').onclick=(
 // Премахни старите пилешки категории от падащия списък.
 refreshCategoryOptions();
 initCats();renderIngredientEditor([{amount:'',unit:'',name:'',scale:true}]);
+async function syncCentralRecipeLibrary(){
+ const libraryUrl=new URL('recipes_library.json',document.baseURI).href;
+ try{
+  const response=await fetch(libraryUrl,{cache:'no-store'});
+  if(!response.ok)throw new Error('library-http-'+response.status);
+  const data=await response.json();
+  if(!data||data.schemaVersion!==1||!Array.isArray(data.recipes))throw new Error('library-schema-invalid');
+  let favorites=[];try{const saved=JSON.parse(localStorage.getItem('rmp_central_favorites_v1')||'[]');if(Array.isArray(saved))favorites=saved.map(String)}catch(error){console.warn('Централните любими не могат да бъдат прочетени',error)}
+  const favoriteSet=new Set(favorites),existingCentral=new Map(recipes.filter(r=>r.librarySource==='central').map(r=>[String(r.libraryId),r]));
+  let added=0,updated=0,skipped=0;
+  for(const source of data.recipes){
+   if(!source||typeof source!=='object'||Array.isArray(source)||typeof source.id!=='string'||!source.id.trim()||typeof source.name!=='string'||!source.name.trim()){skipped++;continue}
+   const libraryId=source.id.trim(),id='central:'+libraryId,category=String(source.cat||'Други').trim()||'Други';
+   const prior=existingCentral.get(libraryId);
+   if(!prior&&recipes.some(r=>!r.librarySource&&String(r.name||'').trim().toLocaleLowerCase('bg')===source.name.trim().toLocaleLowerCase('bg')&&String(r.cat||'Други').trim().toLocaleLowerCase('bg')===category.toLocaleLowerCase('bg'))){skipped++;continue}
+   const record={...source,id,libraryId,librarySource:'central',cat:category,created:Number(source.created)||Date.now(),tags:Array.isArray(source.tags)?source.tags.filter(x=>typeof x==='string'):[],serv:Math.max(1,Number(source.serv)||1),url:safeUrl(source.url||''),img:safeImageUrl(source.img||''),ingredients:Array.isArray(source.ingredients)?source.ingredients.filter(x=>x&&typeof x==='object'&&!Array.isArray(x)):[],ing:String(source.ing||''),steps:String(source.steps||''),time:String(source.time??''),temp:String(source.temp??''),notes:String(source.notes||''),favorite:favoriteSet.has(id)};
+   if(!record.ing&&record.ingredients.length)record.ing=ingredientLinesFromRows(record.ingredients);
+   if(prior){record.favorite=!!prior.favorite||favoriteSet.has(id);recipes[recipes.indexOf(prior)]=record;updated++}
+   else{recipes.push(record);added++}
+  }
+  if(added||updated)renderRecipes();
+  console.info('Recipe Master Plus: централна библиотека заредена',{added,updated,skipped,total:data.recipes.length,updatedAt:data.updatedAt||null});
+ }catch(error){console.warn('Recipe Master Plus: централната библиотека не е достъпна; приложението продължава с локалните рецепти и кеша на браузъра.',error)}
+}
 (async()=>{
  try{await rmpHydrateImages();console.info('Recipe Master Plus: изображенията са заредени от IndexedDB.')}
  catch(error){console.error('Recipe Master Plus: миграцията/зареждането на изображенията не завърши',error);alert('Част от снимките не бяха преместени в IndexedDB. Оригиналните данни са запазени. Приложението ще се отвори с наличните локални снимки.')}
+ await syncCentralRecipeLibrary();
  renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
 })();
 </script>
