@@ -149,13 +149,11 @@ export class RecipeMasterDataManager {
     const done = transactionDone(tx);
     const appStore = tx.objectStore('appState');
     const metaStore = tx.objectStore('metadata');
-    const meta = await getRequest(metaStore, 'state');
-    if (!meta || meta.authoritative !== true) {
-      await done;
-      return null;
-    }
-    const values = await Promise.all(COLLECTIONS.map(name => getRequest(appStore, name)));
+    const metaPromise = getRequest(metaStore, 'state');
+    const valuePromises = COLLECTIONS.map(name => getRequest(appStore, name));
+    const [meta, values] = await Promise.all([metaPromise, Promise.all(valuePromises)]);
     await done;
+    if (!meta || meta.authoritative !== true) return null;
     const state = {};
     COLLECTIONS.forEach((name, index) => {
       if (!values[index] || !Object.prototype.hasOwnProperty.call(values[index], 'value')) {
@@ -210,18 +208,21 @@ export class RecipeMasterDataManager {
       const appStore = tx.objectStore('appState');
       const metaStore = tx.objectStore('metadata');
 
-      COLLECTIONS.forEach(name => {
-        appStore.put({ key: name, value: validated[name] });
-      });
-      const previousMeta = await getRequest(metaStore, 'state');
-      metaStore.put({
-        key: 'state',
-        schemaVersion: this.dbVersion,
-        authoritative: true,
-        revision: (Number(previousMeta?.revision) || 0) + 1,
-        updatedAt: new Date().toISOString(),
-        counts: Object.fromEntries(COLLECTIONS.map(name => [name, validated[name].length]))
-      });
+      const metaRequest = metaStore.get('state');
+      metaRequest.onsuccess = () => {
+        const previousMeta = metaRequest.result;
+        COLLECTIONS.forEach(name => {
+          appStore.put({ key: name, value: validated[name] });
+        });
+        metaStore.put({
+          key: 'state',
+          schemaVersion: this.dbVersion,
+          authoritative: true,
+          revision: (Number(previousMeta?.revision) || 0) + 1,
+          updatedAt: new Date().toISOString(),
+          counts: Object.fromEntries(COLLECTIONS.map(name => [name, validated[name].length]))
+        });
+      };
       await done;
       return { committed: true, state: clone(validated) };
     });
