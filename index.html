@@ -755,7 +755,81 @@ function persist(){
 }
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function safeUrl(value){try{const u=new URL(value);return ['http:','https:'].includes(u.protocol)?u.href:''}catch{return ''}}
-function safeImageUrl(value){const s=String(value||'');if(/^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+=*$/i.test(s))return s;return safeUrl(s)}
+
+// Локално хранилище за изображения. Старите Base64 изображения се мигрират
+// само след запис и проверка в IndexedDB; оригиналите остават при неуспех.
+const rmpImageUrls=new Map();
+let rmpImageDbPromise=null;
+function openRmpImageDb(){
+ if(!('indexedDB'in window))return Promise.reject(new Error('indexeddb-unavailable'));
+ if(rmpImageDbPromise)return rmpImageDbPromise;
+ rmpImageDbPromise=new Promise((resolve,reject)=>{
+  const request=indexedDB.open('recipe-master-plus-images',1);
+  request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains('images'))db.createObjectStore('images',{keyPath:'id'})};
+  request.onsuccess=()=>resolve(request.result);
+  request.onerror=()=>reject(request.error||new Error('indexeddb-open-failed'));
+  request.onblocked=()=>reject(new Error('indexeddb-blocked'));
+ });
+ return rmpImageDbPromise;
+}
+async function rmpImagePut(id,dataUrl){
+ const db=await openRmpImageDb();
+ await new Promise((resolve,reject)=>{
+  const tx=db.transaction('images','readwrite');
+  tx.objectStore('images').put({id,dataUrl});
+  tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('indexeddb-write-failed'));tx.onabort=()=>reject(tx.error||new Error('indexeddb-write-aborted'));
+ });
+ const check=await rmpImageGet(id);
+ if(check!==dataUrl)throw new Error('indexeddb-verify-failed');
+ const response=await fetch(dataUrl);
+ const blob=await response.blob();
+ const url=URL.createObjectURL(blob);
+ const previous=rmpImageUrls.get(id);if(previous)URL.revokeObjectURL(previous);
+ rmpImageUrls.set(id,url);
+ return 'idb:'+id;
+}
+async function rmpImageGet(id){
+ const db=await openRmpImageDb();
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction('images','readonly'),request=tx.objectStore('images').get(id);
+  request.onsuccess=()=>resolve(request.result?.dataUrl||null);
+  request.onerror=()=>reject(request.error||new Error('indexeddb-read-failed'));
+ });
+}
+async function rmpResolveImage(id){
+ if(rmpImageUrls.has(id))return rmpImageUrls.get(id);
+ const dataUrl=await rmpImageGet(id);if(!dataUrl)return '';
+ const blob=await (await fetch(dataUrl)).blob(),url=URL.createObjectURL(blob);
+ rmpImageUrls.set(id,url);return url;
+}
+function rmpNewImageId(){
+ return 'img-'+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
+}
+async function rmpSaveImage(dataUrl){
+ if(typeof dataUrl!=='string'||!/^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(dataUrl))throw new Error('invalid-image-data');
+ return rmpImagePut(rmpNewImageId(),dataUrl);
+}
+async function rmpHydrateImages(){
+ const records=[];
+ recipes.forEach((r,index)=>{if(typeof r.img==='string'&&r.img.startsWith('data:image/'))records.push({owner:r,field:'img',value:r.img,index})});
+ customCategories.forEach((c,index)=>{if(typeof c.photo==='string'&&c.photo.startsWith('data:image/'))records.push({owner:c,field:'photo',value:c.photo,index})});
+ const replacements=[];
+ for(const item of records){
+  const pointer=await rmpSaveImage(item.value);
+  replacements.push({...item,pointer});
+ }
+ replacements.forEach(x=>{x.owner[x.field]=x.pointer});
+ if(replacements.length&&!persist()){
+  replacements.forEach(x=>{x.owner[x.field]=x.value});
+  throw new Error('image-migration-state-save-failed');
+ }
+ const refs=[];
+ recipes.forEach(r=>{if(typeof r.img==='string'&&r.img.startsWith('idb:'))refs.push(r.img.slice(4))});
+ customCategories.forEach(c=>{if(typeof c.photo==='string'&&c.photo.startsWith('idb:'))refs.push(c.photo.slice(4))});
+ for(const id of new Set(refs))await rmpResolveImage(id);
+}
+
+function safeImageUrl(value){const s=String(value||'');if(s.startsWith('idb:'))return rmpImageUrls.get(s.slice(4))||'';if(/^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+=*$/i.test(s))return s;return safeUrl(s)}
 function initCats(){const sel=$('rcat');if(!sel)return;sel.innerHTML='';[...new Set(categories)].forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)})}
 function switchTab(id,options={}){const currentTab=document.querySelector('.tabs button.active')?.dataset.tab;if(id!=='recipes'&&currentTab==='recipes'&&history.state?.rmpView)history.replaceState({rmpView:'home'},'',location.href);if(id==='recipes'&&currentTab!=='recipes'&&!options.preserveCategory)selectedCategory=null;document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===id));document.querySelectorAll('.panel').forEach(p=>{p.classList.toggle('active',p.id===id);p.hidden=p.id!==id});if(id==='recipes')renderRecipes();if(id==='meat')renderMeat();if(id==='shopping')renderShop();requestAnimationFrame(()=>{window.scrollTo({top:0,behavior:'instant'});if(id==='add')$('rname').focus({preventScroll:true})})}
 $('tabs').addEventListener('click',e=>{const b=e.target.closest('button[data-tab]');if(b)switchTab(b.dataset.tab)});
@@ -977,7 +1051,8 @@ async function saveUploadedRecipePhoto(r,file){
   const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas 2D не е наличен на това устройство');ctx.drawImage(image,0,0,canvas.width,canvas.height);
   const compressed=canvas.toDataURL('image/jpeg',0.82);if(!compressed.startsWith('data:image/jpeg;base64,'))throw new Error('Неуспешно компресиране на снимката');
   const previous={img:r.img,photoCredit:r.photoCredit,photoLicense:r.photoLicense,photoPage:r.photoPage,photoSource:r.photoSource};
-  r.img=compressed;r.photoCredit='Качена от потребителя';r.photoLicense='Лична снимка';r.photoPage='';r.photoSource='Локално качване';r.photoError=false;r.photoLoading=false;
+  const storedImage=await rmpSaveImage(compressed);
+  r.img=storedImage;r.photoCredit='Качена от потребителя';r.photoLicense='Лична снимка';r.photoPage='';r.photoSource='Локално качване';r.photoError=false;r.photoLoading=false;
   if(!persist()){Object.assign(r,previous);return}
   refreshRecipePhotoArea(r);
  }catch(error){console.error('Recipe Master Plus: качването на снимка не успя',error);alert('Не успях да обработя тази снимка. Опитай с JPG или PNG файл.')}
@@ -1145,7 +1220,12 @@ function downloadBackup(){
   alert('Не може да бъде създаден стандартен архив, защото част от локалните данни не се четат. Изтеглих диагностично копие, което запазва оригиналния прочетен текст за възстановяване.');
   return;
  }
- const payload={app:'Recipe Master Plus',version:4,schemaVersion:2,recipes,meatNotes,shopping,customCategories,exportedAt:new Date().toISOString()};
+ const exportRecipes=cloneState(recipes),exportCategories=cloneState(customCategories);
+ try{
+  for(const r of exportRecipes)if(typeof r.img==='string'&&r.img.startsWith('idb:')){const data=await rmpImageGet(r.img.slice(4));if(!data)throw new Error('missing-recipe-image');r.img=data}
+  for(const c of exportCategories)if(typeof c.photo==='string'&&c.photo.startsWith('idb:')){const data=await rmpImageGet(c.photo.slice(4));if(!data)throw new Error('missing-category-image');c.photo=data}
+ }catch(error){console.error('Recipe Master Plus: архивът не може да включи всички снимки',error);alert('Архивът не е създаден, защото една или повече снимки не могат да бъдат прочетени от IndexedDB. Данните не са променени.');return}
+ const payload={app:'Recipe Master Plus',version:4,schemaVersion:2,recipes:exportRecipes,meatNotes,shopping,customCategories:exportCategories,exportedAt:new Date().toISOString()};
  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
  a.href=url;a.download='recipe-master-plus-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)
 }
@@ -1254,14 +1334,14 @@ function refreshCategoryOptions(){const sel=$('rcat');const val=sel.value;sel.in
 function saveCustomCats(){return persist()}
 function renderCustomCategoryList(){const box=$('customCategoryList');if(!box)return;box.innerHTML=customCategories.length?customCategories.map((c,i)=>`<div class="custom-category-row"><div class="grow"><strong>${esc(c.name)}</strong><div class="small">${esc(c.description||'Без описание')} · ${recipes.filter(r=>r.cat===c.name).length} рецепти</div></div><div class="category-order-actions"><button class="btn ghost small" type="button" data-move-cat="${i}" data-dir="-1" ${i===0?'disabled':''} aria-label="Премести нагоре">↑</button><button class="btn ghost small" type="button" data-move-cat="${i}" data-dir="1" ${i===customCategories.length-1?'disabled':''} aria-label="Премести надолу">↓</button></div></div>`).join(''):'<p class="sub">Все още нямаш собствени категории.</p>'; }
 let categoryDraftPhoto='';
-function showCategoryPhoto(src){const box=$('categoryPhotoPreview');box.innerHTML=src?`<img src="${src}" alt="Преглед на снимката">`:'<span>🖼️</span><small>Предварителен преглед</small>';}
+function showCategoryPhoto(src){const box=$('categoryPhotoPreview'),resolved=src?safeImageUrl(src):'';box.innerHTML=resolved?`<img src="${esc(resolved)}" alt="Преглед на снимката">`:'<span>🖼️</span><small>Предварителен преглед</small>';}
 function openCategoryEditor(oldName=null){const old=customCategories.find(c=>c.name===oldName);$('categoryOldName').value=oldName||'';$('categoryFormTitle').textContent=old?'✎ Редактиране на категория':'＋ Нова категория';$('categoryName').value=old?.name||'';$('categoryDescription').value=old?.description||'';categoryDraftPhoto=old?.photo||'';$('categoryPhotoFile').value='';showCategoryPhoto(categoryDraftPhoto);$('categoryFormMessage').textContent='';switchTab('categoryManager');}
 function closeCategoryEditor(){switchTab('recipes');window.scrollTo({top:0,behavior:'smooth'});}
 $('addCategoryBtn').onclick=()=>openCategoryEditor();
 if($('categoryCancel'))$('categoryCancel').onclick=closeCategoryEditor;if($('categoryCancelTop'))if($('categoryCancelTop'))$('categoryCancelTop').onclick=closeCategoryEditor;
 $('categoryPhotoRemove').onclick=()=>{categoryDraftPhoto='';$('categoryPhotoFile').value='';showCategoryPhoto('')};
 $('categoryPhotoFile').onchange=()=>{const f=$('categoryPhotoFile').files[0];if(!f)return;if(!f.type.startsWith('image/')){alert('Избери валиден файл с изображение.');$('categoryPhotoFile').value='';return}if(f.size>5*1024*1024){alert('Изображението трябва да е до 5 MB.');$('categoryPhotoFile').value='';return}const rd=new FileReader();rd.onerror=()=>{alert('Снимката не може да бъде прочетена.');$('categoryPhotoFile').value=''};rd.onload=()=>{const img=new Image();img.onerror=()=>{alert('Файлът не съдържа валидно изображение.');$('categoryPhotoFile').value=''};img.onload=()=>{const max=1200,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale)),canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d');if(!ctx){alert('Не може да се обработи изображението на това устройство.');return}ctx.drawImage(img,0,0,w,h);let compressed=canvas.toDataURL('image/webp',0.8);if(!compressed.startsWith('data:image/webp'))compressed=canvas.toDataURL('image/jpeg',0.78);if(compressed.length>2*1024*1024){alert('Снимката остава твърде голяма след компресиране. Избери по-малко изображение.');$('categoryPhotoFile').value='';return}categoryDraftPhoto=compressed;showCategoryPhoto(categoryDraftPhoto)};img.src=rd.result};rd.readAsDataURL(f)};
-$('categorySave').onclick=()=>{const oldName=$('categoryOldName').value||null,old=customCategories.find(c=>c.name===oldName),name=$('categoryName').value.trim(),description=$('categoryDescription').value.trim();if(!name){$('categoryFormMessage').textContent='Въведи име на категория.';$('categoryName').focus();return}if(categories.some(c=>c.toLocaleLowerCase('bg')===name.toLocaleLowerCase('bg'))&&name!==oldName){$('categoryFormMessage').textContent='Вече съществува категория с това име.';return}if(old){old.name=name;old.description=description;old.photo=categoryDraftPhoto;categories=categories.map(x=>x===oldName?name:x);recipes.forEach(r=>{if(r.cat===oldName)r.cat=name});if(selectedCategory===oldName)selectedCategory=name}else{customCategories.push({name,description,photo:categoryDraftPhoto,created:Date.now()});if(!categories.includes(name))categories.push(name)}if(!persist())return;refreshCategoryOptions();renderRecipes();renderCustomCategoryList();closeCategoryEditor()};
+$('categorySave').onclick=async()=>{const oldName=$('categoryOldName').value||null,old=customCategories.find(c=>c.name===oldName),name=$('categoryName').value.trim(),description=$('categoryDescription').value.trim();if(!name){$('categoryFormMessage').textContent='Въведи име на категория.';$('categoryName').focus();return}if(categories.some(c=>c.toLocaleLowerCase('bg')===name.toLocaleLowerCase('bg'))&&name!==oldName){$('categoryFormMessage').textContent='Вече съществува категория с това име.';return}try{const storedPhoto=categoryDraftPhoto.startsWith('data:image/')?await rmpSaveImage(categoryDraftPhoto):categoryDraftPhoto;if(old){old.name=name;old.description=description;old.photo=storedPhoto;categories=categories.map(x=>x===oldName?name:x);recipes.forEach(r=>{if(r.cat===oldName)r.cat=name});if(selectedCategory===oldName)selectedCategory=name}else{customCategories.push({name,description,photo:storedPhoto,created:Date.now()});if(!categories.includes(name))categories.push(name)}if(!persist())return;refreshCategoryOptions();renderRecipes();renderCustomCategoryList();closeCategoryEditor()}catch(error){console.error('Recipe Master Plus: неуспешно запазване на снимката на категорията',error);$('categoryFormMessage').textContent='Снимката не може да бъде запазена в локалното хранилище. Старите данни са запазени.'}};
 function deleteCustomCategory(name){const count=recipes.filter(r=>r.cat===name).length,choices=categories.filter(c=>c!==name);if(!choices.length){alert('Няма друга категория, в която да преместиш рецептите.');return}let target=null;if(count){const numbered=choices.map((c,i)=>`${i+1}. ${c}`).join('\n');const answer=prompt(`Категория „${name}“ съдържа ${count} рецепти.\nВъведи номера на категорията, в която да ги преместиш:\n${numbered}`,'1');if(answer===null)return;const index=Number(answer)-1;if(!Number.isInteger(index)||index<0||index>=choices.length){alert('Изборът не е валиден. Категорията не е изтрита.');return}target=choices[index]}if(!confirm(count?`Сигурен ли си, че искаш да изтриеш „${name}“ и да преместиш ${count} рецепти в „${target}“?`:`Сигурен ли си, че искаш да изтриеш категория „${name}“?`))return;if(count)recipes.forEach(r=>{if(r.cat===name)r.cat=target});customCategories=customCategories.filter(c=>c.name!==name);categories=categories.filter(c=>c!==name);if(!persist())return;refreshCategoryOptions();selectedCategory=null;renderRecipes();renderCustomCategoryList()}
 $('customCategoryList').addEventListener('click',e=>{const move=e.target.closest('[data-move-cat]');if(!move)return;const i=Number(move.dataset.moveCat),j=i+Number(move.dataset.dir);if(j>=0&&j<customCategories.length){[customCategories[i],customCategories[j]]=[customCategories[j],customCategories[i]];const customNames=new Set(customCategories.map(c=>c.name));categories=[...categories.filter(c=>!customNames.has(c)),...customCategories.map(c=>c.name)];if(!persist())return;renderCustomCategoryList();renderRecipes()}});
 $('categoryMenuToggle').onclick=()=>{const menu=$('categoryActionMenu'),opening=menu.hidden;menu.hidden=!opening;$('categoryMenuToggle').setAttribute('aria-expanded',String(opening))};
@@ -1274,7 +1354,11 @@ gs.addEventListener('input',globalSearchRender);$('globalSearchClear').onclick=(
 // Премахни старите пилешки категории от падащия списък.
 refreshCategoryOptions();
 initCats();renderIngredientEditor([{amount:'',unit:'',name:'',scale:true}]);
-renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
+(async()=>{
+ try{await rmpHydrateImages();console.info('Recipe Master Plus: изображенията са заредени от IndexedDB.')}
+ catch(error){console.error('Recipe Master Plus: миграцията/зареждането на изображенията не завърши',error);alert('Част от снимките не бяха преместени в IndexedDB. Оригиналните данни са запазени. Приложението ще се отвори с наличните локални снимки.')}
+ renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
+})();
 </script>
 <!-- Recipe Master Plus V17.5: primary ingredient scaling in editor, detail view and desktop preview -->
 <!-- Recipe Master Plus V16.5: category selector in recipe detail -->
