@@ -587,13 +587,13 @@ body{padding-bottom:76px}
 
 /* Persistent language switcher */
 #rmpLanguageSwitcher{position:fixed;right:max(10px,env(safe-area-inset-right));top:50%;transform:translateY(-50%);z-index:9998;display:flex;flex-direction:column;align-items:flex-end;gap:8px;font-family:inherit}
-#rmpLanguageCurrent{min-width:50px;min-height:58px;padding:7px 6px;border:1px solid var(--brand);border-radius:28px;background:rgba(25,25,28,.94);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:800;box-shadow:0 0 0 2px rgba(255,121,0,.13),0 0 16px rgba(255,121,0,.38);backdrop-filter:blur(8px)}
-#rmpLanguageCurrent .rmp-lang-flag{font-size:23px;line-height:1.1}
-#rmpLanguageMenu{position:absolute;right:60px;top:50%;transform:translateY(-50%);min-width:150px;padding:6px;border:1px solid var(--brand);border-radius:16px;background:rgba(25,25,28,.97);box-shadow:0 0 18px rgba(255,121,0,.25),var(--shadow);display:flex;flex-direction:column;gap:5px}
+#rmpLanguageCurrent{width:50px;height:50px;min-width:50px;min-height:50px;padding:3px;border:1px solid var(--brand);border-radius:16px;background:rgba(25,25,28,.96);color:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font-size:9px;font-weight:800;line-height:1;box-shadow:0 0 0 1px rgba(255,121,0,.10),0 0 9px rgba(255,121,0,.22);backdrop-filter:blur(8px)}
+#rmpLanguageCurrent .rmp-lang-flag{font-size:19px;line-height:1.05}
+#rmpLanguageMenu{position:absolute;right:58px;top:50%;transform:translateY(-50%);min-width:145px;padding:6px;border:1px solid var(--brand);border-radius:14px;background:rgba(25,25,28,.97);box-shadow:0 0 14px rgba(255,121,0,.18),var(--shadow);display:flex;flex-direction:column;gap:5px}
 #rmpLanguageMenu[hidden]{display:none}
-#rmpLanguageMenu button{border:1px solid var(--line);border-radius:11px;background:var(--surface-2);color:var(--ink);padding:10px 12px;text-align:left;font-weight:700;white-space:nowrap}
+#rmpLanguageMenu button{border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--ink);padding:9px 11px;text-align:left;font-weight:700;white-space:nowrap}
 #rmpLanguageMenu button[aria-pressed="true"]{border-color:var(--brand);color:var(--brand-2);background:rgba(255,121,0,.10)}
-@media(max-width:420px){#rmpLanguageSwitcher{right:max(7px,env(safe-area-inset-right))}#rmpLanguageCurrent{min-width:46px;min-height:54px}#rmpLanguageMenu{right:54px}}
+@media(max-width:420px){#rmpLanguageSwitcher{right:max(7px,env(safe-area-inset-right))}#rmpLanguageCurrent{width:48px;height:48px;min-width:48px;min-height:48px}#rmpLanguageMenu{right:55px}}
 
 </style>
 </head>
@@ -1570,7 +1570,7 @@ function translateText(value){
  const core=value.slice(leading.length,value.length-trailing.length);
  let translated=dictionary()[core];
  if(translated===undefined && language==='en'){
-  const count=core.match(/^(\\d+)\\s+(рецепта|рецепти)$/i);
+  const count=core.match(/^(\d+)\s+(рецепта|рецепти)$/i);
   if(count)translated=count[1]+' '+(count[1]==='1'?'recipe':'recipes');
  }
  return translated===undefined?value:leading+translated+trailing;
