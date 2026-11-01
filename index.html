@@ -971,7 +971,10 @@ function renderRecipes(){
   ...totalCats.map(c=>{
    const n=recipes.filter(r=>r.cat===c).length;
    const photo=customCategories.find(x=>x.name===c)?.photo||categoryPhotos[c]||categoryPhotos[c==='Месни ястия'?'Месни ястия':c==='Домашни колбаси и мезета'?'Домашни колбаси и мезета':c==='Салати и предястия'?'Салати и предястия':''];
-   const photoLayer=photo?`<img class="category-photo-bg" src="${esc(photo)}" alt="" aria-hidden="true">`:'';
+   // Custom category photos may be IndexedDB pointers (idb:...). Resolve them
+   // through the shared image URL map before assigning them to an <img> src.
+   const photoSrc=safeImageUrl(photo);
+   const photoLayer=photoSrc?`<img class="category-photo-bg" src="${esc(photoSrc)}" alt="" aria-hidden="true">`:'';
    return `<button class="category-tile ${selectedCategory===c?'active':''}" type="button" data-category="${esc(c)}">${photoLayer}<span class="category-info"><strong>${esc(c)}</strong><small>${n} ${n===1?'рецепта':'рецепти'}</small></span><span class="category-count">${n}</span></button>`;
   })
  ].join('');
