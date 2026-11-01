@@ -1565,14 +1565,18 @@ const storageKey='rmp_ui_language';
 let language='bg',observer=null,scheduled=false;
 try{language=localStorage.getItem(storageKey)==='en'?'en':'bg';}catch(_){}
 function dictionary(){return language==='en'?translations:reverse;}
+function formatRecipeCount(count,lang){
+ const n=Math.max(0,Math.trunc(Number(count)||0));
+ if(lang==='en')return n+' '+(n===1?'recipe':'recipes');
+ return n+' '+(n===1?'рецепта':'рецепти');
+}
+window.rmpFormatRecipeCount=formatRecipeCount;
 function translateText(value){
  const leading=(value.match(/^\s*/)||[''])[0],trailing=(value.match(/\s*$/)||[''])[0];
  const core=value.slice(leading.length,value.length-trailing.length);
- let translated=dictionary()[core];
- if(translated===undefined && language==='en'){
-  const count=core.match(/^(\d+)\s+(рецепта|рецепти)$/i);
-  if(count)translated=count[1]+' '+(count[1]==='1'?'recipe':'recipes');
- }
+ const count=core.match(/^(\d+)\s+(рецепта|рецепти|recipe|recipes)$/i);
+ if(count)return leading+formatRecipeCount(count[1],language)+trailing;
+ const translated=dictionary()[core];
  return translated===undefined?value:leading+translated+trailing;
 }
 function translateElement(root){
