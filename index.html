@@ -1083,7 +1083,7 @@ function scaleLine(line,factor){
 let cookMode=false,cookStep=0;
 function recipePhotoMarkup(r){
  const img=safeImageUrl(r.img||'');
- const photo=img?`<img class="recipe-photo" src="${esc(img)}" alt="Снимка на ${esc(r.name||'рецептата')}">`:`<div class="detail-photo-placeholder"><span class="photo-placeholder-icon">🍽️</span><strong>${r.photoLoading?'Търся подходяща снимка…':'Няма добавена снимка'}</strong><span class="small">${r.photoError?'Автоматичното търсене не беше успешно. Можеш да опиташ отново.':'Ще потърся безплатна снимка според името на рецептата.'}</span></div>`;
+ const photo=img?`<img class="recipe-photo" src="${esc(img)}" alt="Снимка на ${esc(r.name||'рецептата')}">`:`<div class="detail-photo-placeholder"><span class="photo-placeholder-icon">🍽️</span><strong>${r.photoLoading?'Търся подходяща снимка…':'Няма добавена снимка'}</strong><span class="small">${r.photoError?esc(r.photoErrorMessage||'Автоматичното търсене не беше успешно. Можеш да опиташ отново.'):'Ще потърся безплатна снимка според името на рецептата.'}</span></div>`;
  const credit=r.photoCredit?`<div class="detail-photo-meta"><span>Снимка: ${esc(r.photoCredit)} · ${esc(r.photoLicense||'отворен лиценз')}</span>${r.photoPage&&safeUrl(r.photoPage)?`<a href="${esc(safeUrl(r.photoPage))}" target="_blank" rel="noopener">Източник ↗</a>`:''}</div>`:'';
  return `${photo}${credit}<div class="detail-photo-actions"><button class="btn secondary" id="recipePhotoRetry" type="button">${img?'↻ Смени снимката':'⌕ Потърси снимка'}</button><button class="btn secondary" id="recipePhotoUploadBtn" type="button">⇧ Качи снимка от телефона</button><input id="recipePhotoFile" type="file" accept="image/*" hidden><span class="small">Можеш да избереш снимка от телефона или да направиш нова. Автоматичните снимки са от Openverse.</span></div>`;
 }
@@ -1114,37 +1114,95 @@ async function saveUploadedRecipePhoto(r,file){
 }
 async function findRecipePhoto(r,force=false){
  if(!r||!r.name)return;
- if(r.img&&!force){return}
+ if(r.img&&!force)return;
  const requestId=++recipePhotoRequest;
- if(force){r.img='';r.photoCredit='';r.photoLicense='';r.photoPage='';r.photoError=false}
- r.photoLoading=true;refreshRecipePhotoArea(r);
- const queries=[`${r.name} food`,r.name];
+ // Keep an existing image until a replacement is found successfully.
+ r.photoLoading=true;r.photoError=false;r.photoErrorMessage='';refreshRecipePhotoArea(r);
+ const aliases={
+  'банска кървавица':'Bulgarian blood sausage',
+  'баница':'Bulgarian banitsa cheese pastry',
+  'шопска салата':'shopska salad Bulgarian salad',
+  'кебапче':'Bulgarian kebapche grilled minced meat',
+  'кюфтета':'Bulgarian meatballs',
+  'таратор':'Bulgarian tarator yogurt cucumber soup',
+  'мусака':'Balkan moussaka',
+  'лютеница':'Bulgarian lyutenitsa pepper spread',
+  'сарми':'stuffed cabbage rolls',
+  'каварма':'Bulgarian kavarma stew'
+ };
+ const normalizedName=String(r.name).trim();
+ const alias=aliases[normalizedName.toLocaleLowerCase('bg-BG')];
+ const queries=[`${normalizedName} food`,normalizedName];
+ if(alias)queries.push(alias);
+ const uniqueQueries=[...new Set(queries.map(q=>q.trim()).filter(Boolean))];
+ const photoOffset=force?(Number(r.photoSearchOffset||0)+1):Number(r.photoSearchOffset||0);
+ const failures=[];
  try{
   let chosen=null;
-  const photoOffset=force?(Number(r.photoSearchOffset||0)+1):Number(r.photoSearchOffset||0);
-  for(const query of queries){
-   const endpoint='https://api.openverse.org/v1/images/?q='+encodeURIComponent(query)+'&page_size=12&mature=false';
-   const response=await fetch(endpoint,{method:'GET',mode:'cors',headers:{'Accept':'application/json'}});
-   if(!response.ok)throw new Error('Openverse HTTP '+response.status);
-   const data=await response.json();
-   const results=Array.isArray(data.results)?data.results:[];
-   const validResults=results.filter(x=>x&&x.url&&/^https:\/\//i.test(x.url)&&!x.mature);
-   chosen=validResults.length?validResults[photoOffset%validResults.length]:null;
-   if(chosen)break;
+  for(const query of uniqueQueries){
+   let response;
+   try{
+    const params=new URLSearchParams({q:query,page_size:'20',mature:'false'});
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),12000);
+    try{
+     response=await fetch('https://api.openverse.org/v1/images/?'+params.toString(),{
+      method:'GET',mode:'cors',headers:{'Accept':'application/json'},signal:controller.signal
+     });
+    }finally{clearTimeout(timeout)}
+    if(!response.ok){
+     const status=response.status;
+     failures.push('HTTP '+status+' при търсене „'+query+'“');
+     console.warn('Recipe Master Plus: Openverse върна HTTP '+status,{query});
+     // A rate limit applies to the API, so further immediate requests are unlikely to help.
+     if(status===429)break;
+     continue;
+    }
+    const data=await response.json();
+    if(!data||!Array.isArray(data.results)){
+     failures.push('Невалиден отговор от Openverse');
+     continue;
+    }
+    const validResults=data.results.filter(x=>{
+     if(!x||x.mature)return false;
+     const imageUrl=x.thumbnail||x.url;
+     return typeof imageUrl==='string'&&/^https:\/\//i.test(imageUrl);
+    });
+    if(validResults.length){
+     chosen=validResults[photoOffset%validResults.length];
+     break;
+    }
+    failures.push('Няма подходящи резултати за „'+query+'“');
+   }catch(queryError){
+    const reason=queryError?.name==='AbortError'?'времето за изчакване изтече':(queryError?.message||'мрежова/CORS грешка');
+    failures.push(reason+' („'+query+'“)'); 
+    console.warn('Recipe Master Plus: заявката към Openverse не успя',{query,error:queryError});
+   }
+   if(requestId!==recipePhotoRequest||activeRecipe?.id!==r.id)return;
   }
   if(requestId!==recipePhotoRequest||activeRecipe?.id!==r.id)return;
-  if(!chosen)throw new Error('No image results');
+  if(!chosen){
+   const rateLimited=failures.some(x=>x.includes('HTTP 429'));
+   const forbidden=failures.some(x=>x.includes('HTTP 403'));
+   if(rateLimited)throw new Error('Openverse временно ограничи заявките (HTTP 429). Опитай отново след малко.');
+   if(forbidden)throw new Error('Openverse отказа достъп (HTTP 403). Възможно е ограничение на заявките от мрежата.');
+   if(failures.some(x=>x.includes('HTTP 5')))throw new Error('Openverse има временен проблем със сървъра.');
+   if(failures.some(x=>x.includes('времето за изчакване')||x.includes('мрежова/CORS')))throw new Error('Няма връзка с Openverse или браузърът блокира заявката. Провери интернет връзката.');
+   throw new Error('Openverse не намери подходящи снимки по тези думи. Опитай с по-кратко или английско име.');
+  }
   r.photoSearchOffset=photoOffset;
   r.img=chosen.thumbnail||chosen.url;
   r.photoCredit=chosen.creator||'Неуточнен автор';
   r.photoLicense=[chosen.license,chosen.license_version].filter(Boolean).join(' ').toUpperCase()||'Отворен лиценз';
   r.photoPage=chosen.foreign_landing_url||chosen.detail_url||'';
-  r.photoSource=chosen.source||'Openverse';r.photoError=false;r.photoLoading=false;
-  if(!persist())return;refreshRecipePhotoArea(r);
+  r.photoSource=chosen.source||'Openverse';r.photoError=false;r.photoErrorMessage='';r.photoLoading=false;
+  if(!persist())return;
+  refreshRecipePhotoArea(r);
  }catch(error){
   if(requestId!==recipePhotoRequest||activeRecipe?.id!==r.id)return;
-  r.photoLoading=false;r.photoError=true;refreshRecipePhotoArea(r);
-  console.warn('Recipe Master Plus: автоматичното търсене на снимка не успя',error);
+  r.photoLoading=false;r.photoError=true;r.photoErrorMessage=error?.message||'Автоматичното търсене не беше успешно.';
+  refreshRecipePhotoArea(r);
+  console.warn('Recipe Master Plus: автоматичното търсене на снимка не успя',error,{failures});
  }
 }
 let detailScaleMode='servings',detailBaseAmount='';
