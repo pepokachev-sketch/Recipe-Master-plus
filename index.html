@@ -679,7 +679,7 @@ dialog#detailDialog #wakeLockToggle[aria-pressed="true"]::after{
  </div>
 </section>
 <section id="add" class="panel"><div class="card">
- <div class="card-head"><div><h2 id="formTitle">Добави рецепта</h2></div></div>
+ <div class="card-head"><div><h2 id="formTitle">Добави рецепта</h2></div><button class="btn secondary small" id="aiRecipeImportBtn" type="button">✦ Импорт от ChatGPT</button><input id="aiRecipeImportFile" type="file" accept="application/json,.json" hidden></div>
  <input id="editId" type="hidden">
  <label>Име на рецептата *</label><input id="rname" placeholder="Например: Пилешки дробчета по селски">
  <div><label>Категория</label><select id="rcat"></select></div>
@@ -749,7 +749,7 @@ dialog#detailDialog #wakeLockToggle[aria-pressed="true"]::after{
 </div>
 
 <footer style="display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center">Recipe Master Plus V18.3 · Твоето кулинарно пространство за идеи, вкус и майсторство.<span style="display:inline-flex;align-items:center;gap:8px;font-size:12px;opacity:.9"> <img src="./icons/odin-wolf.svg?v=5" alt="Odin wolf" width="44" height="44" style="display:block;width:44px;height:44px;object-fit:contain;flex:0 0 44px"> <span>made by OΔIN</span></span></footer>
-<dialog id="detailDialog"><div id="detailContent"></div><div class="dialog-actions"><button class="btn secondary" id="detailEdit">✎ Редактирай</button><button class="btn secondary" id="detailDelete" type="button"><span class="delete-recipe-icon" aria-hidden="true">🗑️</span><span>Изтрий рецептата</span></button><button class="btn secondary" id="detailShop">Добави продуктите в списъка</button><button class="btn" id="closeDetail">Затвори</button></div></dialog>
+<dialog id="aiRecipeImportDialog"><h2>Преглед на импортираната рецепта</h2><p class="small">Провери съдържанието. Рецептата няма да бъде записана, докато не потвърдиш.</p><pre id="aiRecipeImportPreview" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:45vh;overflow:auto;background:var(--surface-2);padding:12px;border-radius:10px;font:13px/1.5 inherit"></pre><p id="aiRecipeImportStatus" class="small" role="status"></p><div class="dialog-actions"><button class="btn secondary" id="aiRecipeImportCancel" type="button">Отказ</button><button class="btn" id="aiRecipeImportSave" type="button">Запази рецептата</button></div></dialog>\n<dialog id="detailDialog"><div id="detailContent"></div><div class="dialog-actions"><button class="btn secondary" id="detailEdit">✎ Редактирай</button><button class="btn secondary" id="detailDelete" type="button"><span class="delete-recipe-icon" aria-hidden="true">🗑️</span><span>Изтрий рецептата</span></button><button class="btn secondary" id="detailShop">Добави продуктите в списъка</button><button class="btn" id="closeDetail">Затвори</button></div></dialog>
 <dialog id="expandedEditDialog">
  <h2 id="expandedEditTitle">Редактиране</h2>
  <p class="sub" id="expandedEditHint">Редактирай текста в по-голямо поле.</p>
@@ -1585,6 +1585,67 @@ async function syncCentralRecipeLibrary(){
  await syncCentralRecipeLibrary();
  renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
 })();
+
+// AI recipe package import — review first, then save through the existing storage adapters.
+let pendingAIRecipeImport = null;
+const aiImportButton = $('aiRecipeImportBtn');
+const aiImportFile = $('aiRecipeImportFile');
+const aiImportDialog = $('aiRecipeImportDialog');
+if (aiImportButton && aiImportFile && aiImportDialog) {
+ aiImportButton.addEventListener('click',()=>aiImportFile.click());
+ aiImportFile.addEventListener('change',async()=>{
+  const file=aiImportFile.files?.[0];aiImportFile.value='';if(!file)return;
+  if(file.size>12*1024*1024){alert('JSON пакетът е твърде голям (максимум 12 MB).');return;}
+  try{
+   const raw=await file.text();
+   const importer=await import('./src/ai-recipe-importer.js');
+   const recipe=importer.validateRecipePackage(JSON.parse(raw));
+   const duplicate=recipes.find(r=>!r.librarySource&&String(r.name||'').trim().toLocaleLowerCase('bg')===recipe.name.toLocaleLowerCase('bg'));
+   if(duplicate){alert('Вече има лична рецепта със същото име: „'+duplicate.name+'“. Импортът е спрян, за да не се създаде дубликат.');return;}
+   pendingAIRecipeImport=recipe;
+   const category=categories.includes(recipe.category)?recipe.category:'Други';
+   const preview=[
+    'Име: '+recipe.name,'Категория: '+category,'Порции: '+recipe.servings,
+    'Продукти:',...recipe.ingredients.map(x=>'• '+[x.amount,x.unit,x.name].filter(Boolean).join(' ')),
+    '','Приготвяне:',recipe.steps||'Няма добавени стъпки.',
+    recipe.tags.length?'Етикети: '+recipe.tags.join(', '):'',
+    recipe.time?'Време: '+recipe.time+' минути':'',
+    recipe.temperature?'Температура: '+recipe.temperature+' °C':'',
+    recipe.notes?'Бележки: '+recipe.notes:'',
+    recipe.sourceUrl?'Източник: '+recipe.sourceUrl:'',
+    recipe.imageDataUrl?'Снимка: включена в пакета':'Снимка: няма'
+   ].filter(Boolean).join('\n');
+   $('aiRecipeImportPreview').textContent=preview;
+   $('aiRecipeImportStatus').textContent='Пакетът е валиден. Провери рецептата преди запис.';
+   $('aiRecipeImportSave').disabled=false;
+   aiImportDialog.showModal();
+  }catch(error){
+   console.error('Recipe Master Plus: AI import failed',error);
+   alert('Импортът не успя: '+(error?.message||'невалиден JSON пакет')+'. Оригиналните рецепти не са променени.');
+  }
+ });
+ $('aiRecipeImportCancel').onclick=()=>{pendingAIRecipeImport=null;aiImportDialog.close()};
+ aiImportDialog.addEventListener('cancel',e=>{e.preventDefault();pendingAIRecipeImport=null;aiImportDialog.close()});
+ $('aiRecipeImportSave').onclick=async()=>{
+  const recipe=pendingAIRecipeImport;if(!recipe)return;
+  const saveButton=$('aiRecipeImportSave');saveButton.disabled=true;$('aiRecipeImportStatus').textContent='Записване…';
+  let imageRef='';
+  try{
+   if(recipe.imageDataUrl)imageRef=await rmpSaveImage(recipe.imageDataUrl);
+   const rows=recipe.ingredients.map(x=>({...x,id:x.id||rmpNewImageId().replace('img-','ing-')}));
+   const category=categories.includes(recipe.category)?recipe.category:'Други';
+   const record={id:'recipe-'+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)),created:Date.now(),name:recipe.name,tags:recipe.tags,cat:category,serv:Math.max(1,Number(recipe.servings)||4),url:recipe.sourceUrl,img:imageRef,ingredients:rows,ing:ingredientLinesFromRows(rows),steps:recipe.steps,time:recipe.time,temp:recipe.temperature,notes:recipe.notes,favorite:false};
+   recipes.unshift(record);
+   if(!persist()){recipes=recipes.filter(r=>r.id!==record.id);saveButton.disabled=false;$('aiRecipeImportStatus').textContent='Записът не беше потвърден от локалното хранилище.';return;}
+   pendingAIRecipeImport=null;aiImportDialog.close();selectedCategory=category;renderRecipes();
+   alert('Рецептата „'+record.name+'“ е импортирана успешно.');
+  }catch(error){
+   saveButton.disabled=false;$('aiRecipeImportStatus').textContent='Грешка при запис: '+(error?.message||'неизвестна грешка');
+   console.error('Recipe Master Plus: AI import save failed',error);
+  }
+ };
+}
+
 </script>
 <!-- Recipe Master Plus V17.5: primary ingredient scaling in editor, detail view and desktop preview -->
 <!-- Recipe Master Plus V16.5: category selector in recipe detail -->
