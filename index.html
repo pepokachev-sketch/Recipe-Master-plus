@@ -164,6 +164,8 @@ input:focus,select:focus,textarea:focus{border-color:#ff7900!important;box-shado
 .row-edit{width:30px;height:30px;border:1px solid #5a3a22;border-radius:9px;background:#28201a;color:#ffad68;font-size:18px;line-height:1;padding:0;display:grid;place-items:center}
 .row-delete{width:30px;height:30px;flex:0 0 30px;border:1px solid #633331;border-radius:9px;background:#2b1b1b;color:#ff7770;font-size:15px;line-height:1;padding:0;display:grid;place-items:center}
 .row-delete:active{background:#512321}
+.row-move{width:30px;height:30px;flex:0 0 30px;border:1px solid #5a452b;border-radius:9px;background:#25231d;color:#ffc078;font-size:19px;line-height:1;padding:0;display:grid;place-items:center}.row-move:active{background:#44331f}
+@media(max-width:600px){.row-move{width:29px;height:29px;flex-basis:29px}}
 @media(max-width:600px){
  .btn{padding:8px 11px;font-size:13px;border-radius:10px}
  .btn.small{padding:6px 9px;font-size:11px}
@@ -749,7 +751,8 @@ dialog#detailDialog #wakeLockToggle[aria-pressed="true"]::after{
 </div>
 
 <footer style="display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center">Recipe Master Plus V18.3 · Твоето кулинарно пространство за идеи, вкус и майсторство.<span style="display:inline-flex;align-items:center;gap:8px;font-size:12px;opacity:.9"> <img src="./icons/odin-wolf.svg?v=5" alt="Odin wolf" width="44" height="44" style="display:block;width:44px;height:44px;object-fit:contain;flex:0 0 44px"> <span>made by OΔIN</span></span></footer>
-<dialog id="aiRecipeImportDialog"><h2>Преглед на импортираната рецепта</h2><p class="small">Провери съдържанието. Рецептата няма да бъде записана, докато не потвърдиш.</p><pre id="aiRecipeImportPreview" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:45vh;overflow:auto;background:var(--surface-2);padding:12px;border-radius:10px;font:13px/1.5 inherit"></pre><p id="aiRecipeImportStatus" class="small" role="status"></p><div class="dialog-actions"><button class="btn secondary" id="aiRecipeImportCancel" type="button">Отказ</button><button class="btn" id="aiRecipeImportSave" type="button">Запази рецептата</button></div></dialog>\n<dialog id="detailDialog"><div id="detailContent"></div><div class="dialog-actions"><button class="btn secondary" id="detailEdit">✎ Редактирай</button><button class="btn secondary" id="detailDelete" type="button"><span class="delete-recipe-icon" aria-hidden="true">🗑️</span><span>Изтрий рецептата</span></button><button class="btn secondary" id="detailShop">Добави продуктите в списъка</button><button class="btn" id="closeDetail">Затвори</button></div></dialog>
+<dialog id="aiRecipeImportDialog"><h2>Преглед на импортираната рецепта</h2><p class="small">Провери съдържанието. Рецептата няма да бъде записана, докато не потвърдиш.</p><pre id="aiRecipeImportPreview" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:45vh;overflow:auto;background:var(--surface-2);padding:12px;border-radius:10px;font:13px/1.5 inherit"></pre><p id="aiRecipeImportStatus" class="small" role="status"></p><div class="dialog-actions"><button class="btn secondary" id="aiRecipeImportCancel" type="button">Отказ</button><button class="btn" id="aiRecipeImportSave" type="button">Запази рецептата</button></div></dialog>\n<dialog id="moveCategoryDialog"><h2>Премести рецептата</h2><p class="small" id="moveCategoryRecipeName">Избери нова категория за рецептата.</p><label for="moveCategorySelect">Нова категория</label><select id="moveCategorySelect"></select><p class="small" id="moveCategoryStatus" role="status"></p><div class="dialog-actions"><button class="btn secondary" id="moveCategoryCancel" type="button">Отказ</button><button class="btn" id="moveCategoryConfirm" type="button">Премести</button></div></dialog>
+<dialog id="detailDialog"><div id="detailContent"></div><div class="dialog-actions"><button class="btn secondary" id="detailEdit">✎ Редактирай</button><button class="btn secondary" id="detailDelete" type="button"><span class="delete-recipe-icon" aria-hidden="true">🗑️</span><span>Изтрий рецептата</span></button><button class="btn secondary" id="detailShop">Добави продуктите в списъка</button><button class="btn" id="closeDetail">Затвори</button></div></dialog>
 <dialog id="expandedEditDialog">
  <h2 id="expandedEditTitle">Редактиране</h2>
  <p class="sub" id="expandedEditHint">Редактирай текста в по-голямо поле.</p>
@@ -1056,7 +1059,7 @@ function renderRecipes(){
   return `<article class="recipe recipe-list-item" data-open="${esc(r.id)}" role="button" tabindex="0" aria-label="Отвори рецептата ${esc(r.name)}">
    ${img?`<img class="recipe-thumb" src="${esc(img)}" alt="" onerror="this.style.display='none'">`:catPhoto?`<div class="recipe-thumb recipe-thumb-photo" style="background-image:url('${catPhoto}')"></div>`:`<div class="recipe-thumb recipe-thumb-empty">${categoryIcons[r.cat]||'🍽️'}</div>`}
    <div class="recipe-list-main"><div class="recipe-top"><div class="recipe-list-title"><h3>${esc(r.name)}</h3><span class="tag">${esc(r.cat||'Други')}</span></div>
-   <div class="recipe-row-actions"><button class="row-edit" title="Редактирай рецептата" aria-label="Редактирай рецептата" ${r.librarySource?'':`<button class="row-edit" title="Редактирай рецептата" aria-label="Редактирай рецептата" onclick="event.stopPropagation();editRecipe('${esc(r.id)}')">✎</button><button class="row-delete" title="Изтрий рецептата" aria-label="Изтрий рецептата" onclick="event.stopPropagation();deleteRecipe('${esc(r.id)}')">🗑</button>`}<button class="favorite ${r.favorite?'on':''}" title="Любима рецепта" aria-label="Любима рецепта" onclick="event.stopPropagation();toggleFavorite('${esc(r.id)}')">${r.favorite?'★':'☆'}</button></div></div>
+   <div class="recipe-row-actions">${r.librarySource?'':`<button class="row-move" title="Премести в друга категория" aria-label="Премести в друга категория" onclick="event.stopPropagation();moveRecipeToCategory('${esc(r.id)}')">⇄</button><button class="row-edit" title="Редактирай рецептата" aria-label="Редактирай рецептата" onclick="event.stopPropagation();editRecipe('${esc(r.id)}')">✎</button><button class="row-delete" title="Изтрий рецептата" aria-label="Изтрий рецептата" onclick="event.stopPropagation();deleteRecipe('${esc(r.id)}')">🗑</button>`}<button class="favorite ${r.favorite?'on':''}" title="Любима рецепта" aria-label="Любима рецепта" onclick="event.stopPropagation();toggleFavorite('${esc(r.id)}')">${r.favorite?'★':'☆'}</button></div></div></div>
    <div class="recipe-list-meta">${count?`<span>▤ ${count} продукта</span>`:''}${r.serv?`<span>♟ ${esc(r.serv)} порции</span>`:''}${r.time?`<span>◷ ${esc(r.time)} мин</span>`:''}</div>${(Array.isArray(r.tags)?r.tags:[]).length?`<div class="recipe-tags">${r.tags.map(t=>`<span class="tag recipe-tag">${esc(t)}</span>`).join('')}</div>`:''}</div><span class="recipe-chevron">›</span></article>`;
  }).join(''):'<div class="empty"><div style="font-size:34px">📖</div><b>Няма рецепти</b>Добави рецепта или избери друга категория.</div>';
  if(window.matchMedia('(min-width:701px)').matches){
@@ -1646,6 +1649,39 @@ if (aiImportButton && aiImportFile && aiImportDialog) {
  };
 }
 
+
+function moveRecipeToCategory(id){
+ const recipe=recipes.find(item=>item.id===id);
+ if(!recipe||recipe.librarySource)return false;
+ const dialog=$('moveCategoryDialog'),select=$('moveCategorySelect');
+ $('moveCategoryRecipeName').textContent='Рецепта: '+recipe.name;
+ select.innerHTML=[...new Set(categories.filter(Boolean))].map(name=>'<option value="'+esc(name)+'">'+esc(name)+'</option>').join('');
+ if(!categories.includes(recipe.cat))select.insertAdjacentHTML('afterbegin','<option value="'+esc(recipe.cat||'Други')+'">'+esc(recipe.cat||'Други')+'</option>');
+ select.value=recipe.cat||'Други';
+ $('moveCategoryStatus').textContent='';
+ dialog.dataset.recipeId=id;
+ dialog.showModal();
+ return true;
+}
+$('moveCategoryCancel').addEventListener('click',()=> $('moveCategoryDialog').close());
+$('moveCategoryConfirm').addEventListener('click',()=>{
+ const dialog=$('moveCategoryDialog'),id=dialog.dataset.recipeId;
+ const recipe=recipes.find(item=>item.id===id),nextCategory=$('moveCategorySelect').value;
+ if(!recipe||recipe.librarySource){dialog.close();return}
+ if(!nextCategory){$('moveCategoryStatus').textContent='Избери категория.';return}
+ if(recipe.cat===nextCategory){dialog.close();return}
+ const previousRecipes=recipes,previousCategory=recipe.cat;
+ recipes=recipes.map(item=>item.id===id?{...item,cat:nextCategory}:item);
+ if(!persist()){
+  recipes=previousRecipes;
+  $('moveCategoryStatus').textContent='Преместването не беше записано. Наличните данни са запазени.';
+  return;
+ }
+ dialog.close();
+ renderRecipes();
+ if(activeRecipe?.id===id)activeRecipe=recipes.find(item=>item.id===id)||null;
+ console.info('Recipe Master Plus: рецептата е преместена', {id,from:previousCategory,to:nextCategory});
+});
 </script>
 <!-- Recipe Master Plus V17.5: primary ingredient scaling in editor, detail view and desktop preview -->
 <!-- Recipe Master Plus V16.5: category selector in recipe detail -->
