@@ -610,6 +610,35 @@ dialog#detailDialog #wakeLockToggle{position:fixed!important;right:max(10px,env(
 
 
 
+
+/* Compact circular Screen Wake Lock control */
+#wakeLockToggle,
+dialog#detailDialog #wakeLockToggle{
+ width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;
+ padding:0!important;border-radius:50%!important;border:1px solid #ff8a1f!important;
+ background:rgba(25,25,28,.96)!important;color:#ffad68!important;
+ display:grid!important;place-items:center!important;
+ box-shadow:0 0 0 1px rgba(255,121,0,.14),0 0 10px rgba(255,121,0,.28)!important;
+ backdrop-filter:blur(8px);
+}
+#wakeLockToggle svg{width:19px!important;height:19px!important}
+#wakeLockToggle[aria-pressed="true"],
+dialog#detailDialog #wakeLockToggle[aria-pressed="true"]{
+ background:linear-gradient(145deg,#ff9638,#ff7900)!important;
+ border:2px solid #ff7900!important;color:#fff!important;
+ box-shadow:0 0 0 2px #ff790066,0 0 9px 3px #ff9638aa,0 0 18px 5px #ff790077,inset 0 1px 0 #ffffff88!important;
+}
+#wakeLockToggle[aria-pressed="true"]::after,
+dialog#detailDialog #wakeLockToggle[aria-pressed="true"]::after{
+ top:2px!important;right:2px!important;width:7px!important;height:7px!important;
+}
+@media(max-width:420px){
+ #wakeLockToggle,dialog#detailDialog #wakeLockToggle{
+  right:max(8px,env(safe-area-inset-right))!important;
+  width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important;
+ }
+}
+
 </style>
 </head>
 <body>
