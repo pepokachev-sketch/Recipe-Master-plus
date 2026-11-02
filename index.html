@@ -639,6 +639,12 @@ dialog#detailDialog #wakeLockToggle[aria-pressed="true"]::after{
  }
 }
 
+
+/* Nudge the compact wake control closer to the screen edge, Vercel-style */
+#wakeLockToggle,dialog#detailDialog #wakeLockToggle{
+ right:max(2px,env(safe-area-inset-right))!important;
+}
+
 </style>
 </head>
 <body>
