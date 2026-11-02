@@ -604,6 +604,10 @@ body{padding-bottom:76px}
 #wakeLockToggle[aria-pressed="true"]{background:linear-gradient(145deg,#ff9638,#ff7900);border:2px solid #ff7900;color:#fff;box-shadow:0 0 0 2px #ff790088,0 0 10px 4px #ff9638aa,0 0 18px 5px #ff790088,inset 0 1px 0 #ffffff88}
 #wakeLockToggle[aria-pressed="true"]::after{content:"";position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:#d9ffe2;border:1px solid #087f3c;box-shadow:0 0 7px #fff;pointer-events:none}
 @media(max-width:420px){#wakeLockToggle{right:max(7px,env(safe-area-inset-right));width:48px;height:48px;min-width:48px;min-height:48px}}
+/* Keep the floating control above the recipe dialog's top layer */
+dialog#detailDialog #wakeLockToggle{position:fixed!important;right:max(10px,env(safe-area-inset-right));top:50%;transform:translateY(-50%);z-index:2147483647!important;display:grid!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important}
+@media(max-width:420px){dialog#detailDialog #wakeLockToggle{right:max(7px,env(safe-area-inset-right));width:48px;height:48px;min-width:48px;min-height:48px}}
+
 
 
 </style>
@@ -1650,7 +1654,16 @@ observer.observe(document.body,{subtree:true,childList:true,characterData:true,a
 const languageSwitcher=document.getElementById('rmpLanguageSwitcher');
 const wakeButton=document.getElementById('wakeLockToggle');
 const heroActions=document.querySelector('.hero-actions');
-if(languageSwitcher&&heroActions&&wakeButton){heroActions.appendChild(languageSwitcher);document.body.appendChild(wakeButton);}
+if(languageSwitcher&&heroActions&&wakeButton){
+ heroActions.appendChild(languageSwitcher);
+ const detailDialog=document.getElementById('detailDialog');
+ const placeWakeButton=()=>{if(detailDialog&&detailDialog.open)detailDialog.appendChild(wakeButton);else document.body.appendChild(wakeButton);};
+ placeWakeButton();
+ if(detailDialog){
+  detailDialog.addEventListener('toggle',placeWakeButton);
+  detailDialog.addEventListener('close',placeWakeButton);
+ }
+}
 })();
 </script>
 
