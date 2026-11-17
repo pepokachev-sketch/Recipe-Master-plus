@@ -1,0 +1,8 @@
+{
+  "appId": "com.recipemaster.app",
+  "appName": "Recipe Master Plus",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  }
+}
