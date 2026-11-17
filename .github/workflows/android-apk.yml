@@ -12,6 +12,7 @@ on:
       - 'recipes_library.json'
       - 'src/**'
       - 'icons/**'
+      - 'android-icons/**'
       - 'package.json'
       - 'capacitor.config.json'
       - 'scripts/prepare-android-web.mjs'
@@ -60,6 +61,17 @@ jobs:
 
       - name: Generate Android project
         run: npx cap add android
+
+      - name: Install Recipe Master Plus launcher icon
+        run: |
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p "android/app/src/main/res/mipmap-$density"
+            cp android-icons/ic_launcher.png "android/app/src/main/res/mipmap-$density/ic_launcher.png"
+            cp android-icons/ic_launcher.png "android/app/src/main/res/mipmap-$density/ic_launcher_round.png"
+          done
+          # Use the supplied raster artwork rather than Capacitor's generated adaptive placeholder.
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 
       - name: Sync Capacitor
         run: npx cap sync android
