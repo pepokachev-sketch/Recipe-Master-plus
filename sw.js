@@ -1,13 +1,13 @@
 /* Recipe Master Plus: offline application shell */
 'use strict';
-const CACHE_NAME = 'recipe-master-plus-shell-v1';
+const CACHE_NAME = 'recipe-master-plus-shell-v2';
 const APP_ROOT = new URL('./', self.location.href);
 const APP_URL = new URL('index.html', APP_ROOT).href;
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    await cache.addAll([APP_ROOT.href, APP_URL, new URL('src/backup-image-adapter.js', APP_ROOT).href]);
+    await cache.addAll([APP_ROOT.href, APP_URL, new URL('src/backup-image-adapter.js', APP_ROOT).href, new URL('src/ai-recipe-importer.js', APP_ROOT).href]);
     await self.skipWaiting();
   })());
 });

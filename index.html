@@ -141,7 +141,7 @@ body{background:var(--bg);color:var(--ink)}
 .recipe-list-title{min-width:0}
 .recipe-list-title h3{margin:0 0 3px;font-size:16px;line-height:1.3;white-space:normal}
 .recipe-list-title .tag{margin-top:3px}
-.recipe-list-item .recipe-top{align-items:center}
+.recipe-list-main{flex:1 1 0%;width:0;min-width:0}.recipe-list-item .recipe-top{display:flex;width:100%;min-width:0;flex-direction:row;justify-content:space-between;align-items:flex-start;gap:8px}.recipe-list-title{flex:1 1 auto;min-width:0;max-width:100%;overflow-wrap:anywhere}.recipe-list-title h3{display:block;max-width:100%;overflow-wrap:anywhere;word-break:normal}.recipe-row-actions{display:flex;flex:0 0 auto;flex-wrap:nowrap;justify-content:flex-end;align-items:center}
 .recipe-list-meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;color:#aaaab1;font-size:11px}
 .recipe-chevron{font-size:29px;line-height:1;color:#ff8a1f;padding:0 2px}
 .recipe-list-item .favorite{width:31px;height:31px;flex:0 0 31px}
@@ -164,6 +164,8 @@ input:focus,select:focus,textarea:focus{border-color:#ff7900!important;box-shado
 .row-edit{width:30px;height:30px;border:1px solid #5a3a22;border-radius:9px;background:#28201a;color:#ffad68;font-size:18px;line-height:1;padding:0;display:grid;place-items:center}
 .row-delete{width:30px;height:30px;flex:0 0 30px;border:1px solid #633331;border-radius:9px;background:#2b1b1b;color:#ff7770;font-size:15px;line-height:1;padding:0;display:grid;place-items:center}
 .row-delete:active{background:#512321}
+.row-move{width:30px;height:30px;flex:0 0 30px;border:1px solid #5a452b;border-radius:9px;background:#25231d;color:#ffc078;font-size:19px;line-height:1;padding:0;display:grid;place-items:center}.row-move:active{background:#44331f}
+@media(max-width:600px){.row-move{width:29px;height:29px;flex-basis:29px}}
 @media(max-width:600px){
  .btn{padding:8px 11px;font-size:13px;border-radius:10px}
  .btn.small{padding:6px 9px;font-size:11px}
@@ -645,6 +647,16 @@ dialog#detailDialog #wakeLockToggle[aria-pressed="true"]::after{
  right:max(2px,env(safe-area-inset-right))!important;
 }
 
+
+/* Mobile recipe row: keep action buttons on their own top line so the title
+   never gets squeezed into a one-character-wide flex column. */
+@media(max-width:700px){
+ .recipe-list-main{flex:1 1 auto;width:auto;min-width:0}
+ .recipe-list-item .recipe-top{position:relative;display:block;width:100%;min-width:0}
+ .recipe-list-item .recipe-list-title{display:block;width:100%;max-width:none;min-width:0;padding-top:38px;overflow:visible}
+ .recipe-list-item .recipe-list-title h3{display:block;width:100%;max-width:none;white-space:normal;overflow-wrap:break-word;word-break:normal}
+ .recipe-list-item .recipe-row-actions{position:absolute;top:0;right:0;display:flex;flex-wrap:nowrap;justify-content:flex-end;max-width:100%}
+}
 </style>
 </head>
 <body>
@@ -679,7 +691,7 @@ dialog#detailDialog #wakeLockToggle[aria-pressed="true"]::after{
  </div>
 </section>
 <section id="add" class="panel"><div class="card">
- <div class="card-head"><div><h2 id="formTitle">Добави рецепта</h2></div></div>
+ <div class="card-head"><div><h2 id="formTitle">Добави рецепта</h2></div><button class="btn secondary small" id="aiRecipeImportBtn" type="button">✦ Импорт от ChatGPT</button><input id="aiRecipeImportFile" type="file" accept="application/json,.json" hidden></div>
  <input id="editId" type="hidden">
  <label>Име на рецептата *</label><input id="rname" placeholder="Например: Пилешки дробчета по селски">
  <div><label>Категория</label><select id="rcat"></select></div>
@@ -749,6 +761,7 @@ dialog#detailDialog #wakeLockToggle[aria-pressed="true"]::after{
 </div>
 
 <footer style="display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center">Recipe Master Plus V18.3 · Твоето кулинарно пространство за идеи, вкус и майсторство.<span style="display:inline-flex;align-items:center;gap:8px;font-size:12px;opacity:.9"> <img src="./icons/odin-wolf.svg?v=5" alt="Odin wolf" width="44" height="44" style="display:block;width:44px;height:44px;object-fit:contain;flex:0 0 44px"> <span>made by OΔIN</span></span></footer>
+<dialog id="aiRecipeImportDialog"><h2>Преглед на импортираната рецепта</h2><p class="small">Провери съдържанието. Рецептата няма да бъде записана, докато не потвърдиш.</p><pre id="aiRecipeImportPreview" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:45vh;overflow:auto;background:var(--surface-2);padding:12px;border-radius:10px;font:13px/1.5 inherit"></pre><p id="aiRecipeImportStatus" class="small" role="status"></p><div class="dialog-actions"><button class="btn secondary" id="aiRecipeImportCancel" type="button">Отказ</button><button class="btn" id="aiRecipeImportSave" type="button">Запази рецептата</button></div></dialog>\n<dialog id="moveCategoryDialog"><h2>Премести рецептата</h2><p class="small" id="moveCategoryRecipeName">Избери нова категория за рецептата.</p><label for="moveCategorySelect">Нова категория</label><select id="moveCategorySelect"></select><p class="small" id="moveCategoryStatus" role="status"></p><div class="dialog-actions"><button class="btn secondary" id="moveCategoryCancel" type="button">Отказ</button><button class="btn" id="moveCategoryConfirm" type="button">Премести</button></div></dialog>
 <dialog id="detailDialog"><div id="detailContent"></div><div class="dialog-actions"><button class="btn secondary" id="detailEdit">✎ Редактирай</button><button class="btn secondary" id="detailDelete" type="button"><span class="delete-recipe-icon" aria-hidden="true">🗑️</span><span>Изтрий рецептата</span></button><button class="btn secondary" id="detailShop">Добави продуктите в списъка</button><button class="btn" id="closeDetail">Затвори</button></div></dialog>
 <dialog id="expandedEditDialog">
  <h2 id="expandedEditTitle">Редактиране</h2>
@@ -1056,7 +1069,7 @@ function renderRecipes(){
   return `<article class="recipe recipe-list-item" data-open="${esc(r.id)}" role="button" tabindex="0" aria-label="Отвори рецептата ${esc(r.name)}">
    ${img?`<img class="recipe-thumb" src="${esc(img)}" alt="" onerror="this.style.display='none'">`:catPhoto?`<div class="recipe-thumb recipe-thumb-photo" style="background-image:url('${catPhoto}')"></div>`:`<div class="recipe-thumb recipe-thumb-empty">${categoryIcons[r.cat]||'🍽️'}</div>`}
    <div class="recipe-list-main"><div class="recipe-top"><div class="recipe-list-title"><h3>${esc(r.name)}</h3><span class="tag">${esc(r.cat||'Други')}</span></div>
-   <div class="recipe-row-actions"><button class="row-edit" title="Редактирай рецептата" aria-label="Редактирай рецептата" ${r.librarySource?'':`<button class="row-edit" title="Редактирай рецептата" aria-label="Редактирай рецептата" onclick="event.stopPropagation();editRecipe('${esc(r.id)}')">✎</button><button class="row-delete" title="Изтрий рецептата" aria-label="Изтрий рецептата" onclick="event.stopPropagation();deleteRecipe('${esc(r.id)}')">🗑</button>`}<button class="favorite ${r.favorite?'on':''}" title="Любима рецепта" aria-label="Любима рецепта" onclick="event.stopPropagation();toggleFavorite('${esc(r.id)}')">${r.favorite?'★':'☆'}</button></div></div>
+   <div class="recipe-row-actions">${r.librarySource?'':`<button class="row-move" title="Премести в друга категория" aria-label="Премести в друга категория" onclick="event.stopPropagation();moveRecipeToCategory('${esc(r.id)}')">⇄</button><button class="row-edit" title="Редактирай рецептата" aria-label="Редактирай рецептата" onclick="event.stopPropagation();editRecipe('${esc(r.id)}')">✎</button><button class="row-delete" title="Изтрий рецептата" aria-label="Изтрий рецептата" onclick="event.stopPropagation();deleteRecipe('${esc(r.id)}')">🗑</button>`}<button class="favorite ${r.favorite?'on':''}" title="Любима рецепта" aria-label="Любима рецепта" onclick="event.stopPropagation();toggleFavorite('${esc(r.id)}')">${r.favorite?'★':'☆'}</button></div></div>
    <div class="recipe-list-meta">${count?`<span>▤ ${count} продукта</span>`:''}${r.serv?`<span>♟ ${esc(r.serv)} порции</span>`:''}${r.time?`<span>◷ ${esc(r.time)} мин</span>`:''}</div>${(Array.isArray(r.tags)?r.tags:[]).length?`<div class="recipe-tags">${r.tags.map(t=>`<span class="tag recipe-tag">${esc(t)}</span>`).join('')}</div>`:''}</div><span class="recipe-chevron">›</span></article>`;
  }).join(''):'<div class="empty"><div style="font-size:34px">📖</div><b>Няма рецепти</b>Добави рецепта или избери друга категория.</div>';
  if(window.matchMedia('(min-width:701px)').matches){
@@ -1585,6 +1598,100 @@ async function syncCentralRecipeLibrary(){
  await syncCentralRecipeLibrary();
  renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
 })();
+
+// AI recipe package import — review first, then save through the existing storage adapters.
+let pendingAIRecipeImport = null;
+const aiImportButton = $('aiRecipeImportBtn');
+const aiImportFile = $('aiRecipeImportFile');
+const aiImportDialog = $('aiRecipeImportDialog');
+if (aiImportButton && aiImportFile && aiImportDialog) {
+ aiImportButton.addEventListener('click',()=>aiImportFile.click());
+ aiImportFile.addEventListener('change',async()=>{
+  const file=aiImportFile.files?.[0];aiImportFile.value='';if(!file)return;
+  if(file.size>12*1024*1024){alert('JSON пакетът е твърде голям (максимум 12 MB).');return;}
+  try{
+   const raw=await file.text();
+   const importer=await import('./src/ai-recipe-importer.js');
+   const recipe=importer.validateRecipePackage(JSON.parse(raw));
+   const duplicate=recipes.find(r=>!r.librarySource&&String(r.name||'').trim().toLocaleLowerCase('bg')===recipe.name.toLocaleLowerCase('bg'));
+   if(duplicate){alert('Вече има лична рецепта със същото име: „'+duplicate.name+'“. Импортът е спрян, за да не се създаде дубликат.');return;}
+   pendingAIRecipeImport=recipe;
+   const category=categories.includes(recipe.category)?recipe.category:'Други';
+   const preview=[
+    'Име: '+recipe.name,'Категория: '+category,'Порции: '+recipe.servings,
+    'Продукти:',...recipe.ingredients.map(x=>'• '+[x.amount,x.unit,x.name].filter(Boolean).join(' ')),
+    '','Приготвяне:',recipe.steps||'Няма добавени стъпки.',
+    recipe.tags.length?'Етикети: '+recipe.tags.join(', '):'',
+    recipe.time?'Време: '+recipe.time+' минути':'',
+    recipe.temperature?'Температура: '+recipe.temperature+' °C':'',
+    recipe.notes?'Бележки: '+recipe.notes:'',
+    recipe.sourceUrl?'Източник: '+recipe.sourceUrl:'',
+    recipe.imageDataUrl?'Снимка: включена в пакета':'Снимка: няма'
+   ].filter(Boolean).join('\n');
+   $('aiRecipeImportPreview').textContent=preview;
+   $('aiRecipeImportStatus').textContent='Пакетът е валиден. Провери рецептата преди запис.';
+   $('aiRecipeImportSave').disabled=false;
+   aiImportDialog.showModal();
+  }catch(error){
+   console.error('Recipe Master Plus: AI import failed',error);
+   alert('Импортът не успя: '+(error?.message||'невалиден JSON пакет')+'. Оригиналните рецепти не са променени.');
+  }
+ });
+ $('aiRecipeImportCancel').onclick=()=>{pendingAIRecipeImport=null;aiImportDialog.close()};
+ aiImportDialog.addEventListener('cancel',e=>{e.preventDefault();pendingAIRecipeImport=null;aiImportDialog.close()});
+ $('aiRecipeImportSave').onclick=async()=>{
+  const recipe=pendingAIRecipeImport;if(!recipe)return;
+  const saveButton=$('aiRecipeImportSave');saveButton.disabled=true;$('aiRecipeImportStatus').textContent='Записване…';
+  let imageRef='';
+  try{
+   if(recipe.imageDataUrl)imageRef=await rmpSaveImage(recipe.imageDataUrl);
+   const rows=recipe.ingredients.map(x=>({...x,id:x.id||rmpNewImageId().replace('img-','ing-')}));
+   const category=categories.includes(recipe.category)?recipe.category:'Други';
+   const record={id:'recipe-'+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)),created:Date.now(),name:recipe.name,tags:recipe.tags,cat:category,serv:Math.max(1,Number(recipe.servings)||4),url:recipe.sourceUrl,img:imageRef,ingredients:rows,ing:ingredientLinesFromRows(rows),steps:recipe.steps,time:recipe.time,temp:recipe.temperature,notes:recipe.notes,favorite:false};
+   recipes.unshift(record);
+   if(!persist()){recipes=recipes.filter(r=>r.id!==record.id);saveButton.disabled=false;$('aiRecipeImportStatus').textContent='Записът не беше потвърден от локалното хранилище.';return;}
+   pendingAIRecipeImport=null;aiImportDialog.close();selectedCategory=category;renderRecipes();
+   alert('Рецептата „'+record.name+'“ е импортирана успешно.');
+  }catch(error){
+   saveButton.disabled=false;$('aiRecipeImportStatus').textContent='Грешка при запис: '+(error?.message||'неизвестна грешка');
+   console.error('Recipe Master Plus: AI import save failed',error);
+  }
+ };
+}
+
+
+function moveRecipeToCategory(id){
+ const recipe=recipes.find(item=>item.id===id);
+ if(!recipe||recipe.librarySource)return false;
+ const dialog=$('moveCategoryDialog'),select=$('moveCategorySelect');
+ $('moveCategoryRecipeName').textContent='Рецепта: '+recipe.name;
+ select.innerHTML=[...new Set(categories.filter(Boolean))].map(name=>'<option value="'+esc(name)+'">'+esc(name)+'</option>').join('');
+ if(!categories.includes(recipe.cat))select.insertAdjacentHTML('afterbegin','<option value="'+esc(recipe.cat||'Други')+'">'+esc(recipe.cat||'Други')+'</option>');
+ select.value=recipe.cat||'Други';
+ $('moveCategoryStatus').textContent='';
+ dialog.dataset.recipeId=id;
+ dialog.showModal();
+ return true;
+}
+$('moveCategoryCancel').addEventListener('click',()=> $('moveCategoryDialog').close());
+$('moveCategoryConfirm').addEventListener('click',()=>{
+ const dialog=$('moveCategoryDialog'),id=dialog.dataset.recipeId;
+ const recipe=recipes.find(item=>item.id===id),nextCategory=$('moveCategorySelect').value;
+ if(!recipe||recipe.librarySource){dialog.close();return}
+ if(!nextCategory){$('moveCategoryStatus').textContent='Избери категория.';return}
+ if(recipe.cat===nextCategory){dialog.close();return}
+ const previousRecipes=recipes,previousCategory=recipe.cat;
+ recipes=recipes.map(item=>item.id===id?{...item,cat:nextCategory}:item);
+ if(!persist()){
+  recipes=previousRecipes;
+  $('moveCategoryStatus').textContent='Преместването не беше записано. Наличните данни са запазени.';
+  return;
+ }
+ dialog.close();
+ renderRecipes();
+ if(activeRecipe?.id===id)activeRecipe=recipes.find(item=>item.id===id)||null;
+ console.info('Recipe Master Plus: рецептата е преместена', {id,from:previousCategory,to:nextCategory});
+});
 </script>
 <!-- Recipe Master Plus V17.5: primary ingredient scaling in editor, detail view and desktop preview -->
 <!-- Recipe Master Plus V16.5: category selector in recipe detail -->
