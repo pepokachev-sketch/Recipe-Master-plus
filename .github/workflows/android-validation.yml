@@ -1,0 +1,99 @@
+name: Recipe Master Plus Android validation
+
+on:
+  push:
+    branches:
+      - fix/android-backup-existing-directory-2026-11-18
+  pull_request:
+    branches:
+      - feature/android-capacitor
+    paths:
+      - 'index.html'
+      - 'package.json'
+      - 'capacitor.config.json'
+      - 'scripts/**'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rmp-android-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    name: Run tests and build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+
+      - name: Prepare Android SDK
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager 2>/dev/null | sort -V | tail -n 1)"
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager was not found under $SDK_ROOT/cmdline-tools"
+            exit 1
+          fi
+          echo "Using Android SDK manager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install project dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run automated tests
+        run: npm run test:data-manager
+
+      - name: Prepare Android web assets
+        run: npm run android:prepare-web
+
+      - name: Generate Android project
+        run: npx cap add android
+
+      - name: Set APK version to v7
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          path = Path("android/app/build.gradle")
+          content = path.read_text()
+          content, code_count = re.subn(r"(?m)^(\s*versionCode\s+)\d+", r"\g<1>7", content, count=1)
+          content, name_count = re.subn(r"""(?m)^(\s*versionName\s+)(["']).*?\2""", r'\g<1>"7"', content, count=1)
+          if code_count != 1 or name_count != 1:
+              raise SystemExit("Could not safely set Android versionCode/versionName to 7")
+          path.write_text(content)
+          print("Configured versionCode=7 and versionName=7")
+          PY
+
+      - name: Sync Capacitor plugins and assets
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: recipe-master-plus-v7-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
