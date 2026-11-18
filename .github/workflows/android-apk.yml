@@ -16,6 +16,7 @@ on:
       - 'package.json'
       - 'capacitor.config.json'
       - 'scripts/prepare-android-web.mjs'
+      - 'tests/**'
       - '.github/workflows/android-apk.yml'
 
 permissions:
