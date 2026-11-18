@@ -1446,7 +1446,7 @@ async function saveJsonBackup(filename,jsonText){
     // Android SAF may report that the directory already exists even with recursive:true.
     // Reuse it only after stat confirms that the existing path is a directory.
     const existingDirectory=await Filesystem.stat({path:BACKUP_DIRECTORY,directory:'DOCUMENTS'});
-    if(!existingDirectory||(existingDirectory.type&&existingDirectory.type!=='directory'))throw mkdirError;
+    if(!existingDirectory||existingDirectory.type!=='directory')throw mkdirError;
    }
    const saved=await Filesystem.writeFile({path:relativePath,data:jsonText,directory:'DOCUMENTS',encoding:'utf8',recursive:true});
    if(!saved?.uri)throw new Error('filesystem-uri-missing');
