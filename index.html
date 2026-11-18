@@ -1427,12 +1427,32 @@ $('addShop').onclick=()=>{let v=$('shopInput').value.trim();if(v){shopping.push(
 function toggleShop(id){shopping=shopping.map(s=>s.id===id?{...s,done:!s.done}:s);if(!persist())return;renderShop()}function deleteShop(id){shopping=shopping.filter(s=>s.id!==id);if(!persist())return;renderShop()}
 $('clearDone').onclick=()=>{shopping=shopping.filter(s=>!s.done);if(!persist())return;renderShop()};
 $('clearShop').onclick=()=>{if(confirm('Да изчистя ли целия списък?')){shopping=[];if(!persist())return;renderShop()}};
+async function saveJsonBackup(filename,jsonText){
+ const isAndroid=window.Capacitor?.isNativePlatform?.()&&window.Capacitor?.getPlatform?.()==='android';
+ if(isAndroid){
+  try{
+   const Filesystem=window.Capacitor.registerPlugin('Filesystem');
+   const saved=await Filesystem.writeFile({path:'Recipe Master Plus/'+filename,data:jsonText,directory:'DOCUMENTS',recursive:true});
+   if(!saved?.uri)throw new Error('filesystem-uri-missing');
+   alert('Архивът е записан успешно в папка Documents/Recipe Master Plus на телефона.');
+   return true;
+  }catch(error){
+   console.error('Recipe Master Plus: Android архивът не може да бъде записан',error);
+   alert('Неуспешно записване на архива в телефона. Данните не са променени. Техническа причина: '+(error?.message||error));
+   return false;
+  }
+ }
+ const blob=new Blob([jsonText],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download=filename;a.style.display='none';document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),10000);
+ return true;
+}
 async function downloadBackup(){
  if(storageReadErrors.length){
-  const recovery={app:'Recipe Master Plus Recovery',version:1,exportedAt:new Date().toISOString(),warning:'Това е диагностично копие на невалидните или недостъпни локални записи. Не го импортирай като стандартен архив.',storageReadErrors:storageReadErrors.map(item=>({key:item.key,raw:item.raw,error:item.error}))};
-  const blob=new Blob([JSON.stringify(recovery,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download='recipe-master-plus-recovery-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
-  alert('Не може да бъде създаден стандартен архив, защото част от локалните данни не се четат. Изтеглих диагностично копие, което запазва оригиналния прочетен текст за възстановяване.');
+  const recovery={app:'Recipe Master Plus Recovery',version:1,exportedAt:new Date().toISOString(),warning:'Това е диагностично копие на невалидните или недостъпните локални записи. Не го импортирай като стандартен архив.',storageReadErrors:storageReadErrors.map(item=>({key:item.key,raw:item.raw,error:item.error}))};
+  const filename='recipe-master-plus-recovery-'+new Date().toISOString().slice(0,10)+'.json';
+  const saved=await saveJsonBackup(filename,JSON.stringify(recovery,null,2));
+  if(saved)alert('Част от локалните данни не могат да бъдат прочетени. Записах диагностичния архив, който съдържа оригиналния прочетен текст за възстановяване.');
   return;
  }
  const exportRecipes=cloneState(recipes),exportCategories=cloneState(customCategories);
@@ -1443,8 +1463,8 @@ async function downloadBackup(){
   exportCategories.splice(0,exportCategories.length,...portable.customCategories);
  }catch(error){console.error('Recipe Master Plus: архивът не може да включи всички снимки',error);alert('Архивът не е създаден, защото една или повече снимки не могат да бъдат прочетени или проверени. Данните не са променени.');return}
  const payload={app:'Recipe Master Plus',version:4,schemaVersion:2,recipes:exportRecipes,meatNotes,shopping,customCategories:exportCategories,exportedAt:new Date().toISOString()};
- const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
- a.href=url;a.download='recipe-master-plus-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)
+ const filename='recipe-master-plus-backup-'+new Date().toISOString().slice(0,10)+'.json';
+ await saveJsonBackup(filename,JSON.stringify(payload,null,2));
 }
 $('exportData').onclick=downloadBackup;
 function readBackupFile(onValid){
