@@ -18,7 +18,7 @@ test('the backup adapter is precached by the offline service worker', () => {
 
 test('backup export uses native Android Documents storage and keeps browser download fallback', async () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /registerPlugin\('Filesystem'\)/);
+  assert.match(html, /window\.Capacitor\?\.Plugins\?\.Filesystem/);\n  assert.doesNotMatch(html, /window\.Capacitor\.registerPlugin\('Filesystem'\)/);\n  assert.match(html, /filesystem-plugin-unavailable/);
   assert.match(html, /directory:'DOCUMENTS'/);
   assert.match(html, /recipe-master-plus-recovery-/);
   assert.match(html, /URL\.createObjectURL\(blob\)/);
