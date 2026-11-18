@@ -21,7 +21,9 @@ test('backup export uses native Android Documents storage and keeps browser down
   assert.match(html, /window\.Capacitor\?\.Plugins\?\.Filesystem/);
   assert.doesNotMatch(html, /window\.Capacitor\.registerPlugin\('Filesystem'\)/);
   assert.match(html, /filesystem-plugin-unavailable/);
-  assert.match(html, /Filesystem\.mkdir\(\{path:'Recipe Master Plus',directory:'DOCUMENTS',recursive:true\}\)/);\n  assert.match(html, /Filesystem\.writeFile\(\{path:filename,data:jsonText,directory:'DOCUMENTS'\}\)/);\n  assert.doesNotMatch(html, /writeFile\(\{path:'Recipe Master Plus\//);
+  assert.match(html, /Filesystem\.mkdir\(\{path:'Recipe Master Plus',directory:'DOCUMENTS',recursive:true\}\)/);
+  assert.match(html, /Filesystem\.writeFile\(\{path:filename,data:jsonText,directory:'DOCUMENTS'\}\)/);
+  assert.doesNotMatch(html, /writeFile\(\{path:'Recipe Master Plus\//);
   assert.match(html, /recipe-master-plus-recovery-/);
   assert.match(html, /URL\.createObjectURL\(blob\)/);
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
