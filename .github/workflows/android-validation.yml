@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/android-backup-existing-directory-2026-11-18
+      - fix/android-launcher-icon-v8-2026-11-18
   pull_request:
     branches:
       - feature/android-capacitor
@@ -11,6 +12,7 @@ on:
       - 'index.html'
       - 'package.json'
       - 'capacitor.config.json'
+      - 'assets/**'
       - 'scripts/**'
       - 'src/**'
       - 'tests/**'
@@ -68,7 +70,7 @@ jobs:
       - name: Generate Android project
         run: npx cap add android
 
-      - name: Set APK version to v7
+      - name: Set APK version to v8
         run: |
           python3 - <<'PY'
           import re
@@ -80,8 +82,14 @@ jobs:
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not safely set Android versionCode/versionName to 7")
           path.write_text(content)
-          print("Configured versionCode=7 and versionName=7")
+          print("Configured versionCode=8 and versionName=8")
           PY
+
+      - name: Generate Android launcher icons
+        run: npx capacitor-assets generate --android --assetPath assets --iconBackgroundColor '#101012' --iconBackgroundColorDark '#101012'
+
+      - name: Verify Android launcher icons
+        run: node scripts/verify-android-launcher-icons.mjs
 
       - name: Sync Capacitor plugins and assets
         run: npx cap sync android
@@ -93,7 +101,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: recipe-master-plus-v7-debug-apk
+          name: recipe-master-plus-v8-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
