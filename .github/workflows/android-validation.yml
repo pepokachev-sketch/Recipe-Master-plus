@@ -65,8 +65,8 @@ jobs:
           from pathlib import Path
           path = Path("android/app/build.gradle")
           content = path.read_text()
-          content, code_count = re.subn(r'(?m)^(\\s*versionCode\\s+)\\d+', r'\\g<1>7', content, count=1)
-          content, name_count = re.subn(r'(?m)^(\\s*versionName\\s+)[\\"\\'][^\\"\\']+[\\"\\']', r'\\g<1>"7"', content, count=1)
+          content, code_count = re.subn(r"(?m)^(\s*versionCode\s+)\d+", r"\g<1>7", content, count=1)
+          content, name_count = re.subn(r"""(?m)^(\s*versionName\s+)(["']).*?\2""", r'\g<1>"7"', content, count=1)
           if code_count != 1 or name_count != 1:
               raise SystemExit("Could not safely set Android versionCode/versionName to 7")
           path.write_text(content)
