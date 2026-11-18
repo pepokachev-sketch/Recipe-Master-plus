@@ -15,3 +15,13 @@ test('the backup adapter is precached by the offline service worker', () => {
   assert.match(worker, /src\/backup-image-adapter\.js/);
   assert.match(worker, /cache\.addAll\(\[[^\]]*backup-image-adapter\.js/s);
 });
+
+test('backup export uses native Android Documents storage and keeps browser download fallback', async () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /registerPlugin\('Filesystem'\)/);
+  assert.match(html, /directory:'DOCUMENTS'/);
+  assert.match(html, /recipe-master-plus-recovery-/);
+  assert.match(html, /URL\.createObjectURL\(blob\)/);
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.ok(pkg.dependencies['@capacitor/filesystem']);
+});
