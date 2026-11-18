@@ -1294,7 +1294,7 @@ $('detailEdit').onclick=()=>{const id=activeRecipe?.id;if($('detailDialog').open
 $('detailDelete').onclick=()=>{const id=activeRecipe?.id;if(id)deleteRecipe(id)};
 $('closeDetail').onclick=closeRecipeDetail;
 // Native Android Back: close transient dialogs first, then unwind one in-app history entry.
- const capacitorApp=window.Capacitor?.Plugins?.App;
+ const capacitorApp=window.Capacitor?.registerPlugin?.('App');
  if(capacitorApp?.addListener){
   capacitorApp.addListener('backButton',event=>{
    const openDialog=[...document.querySelectorAll('dialog[open]')].find(d=>d.id!=='detailDialog');
