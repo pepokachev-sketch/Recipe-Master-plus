@@ -1435,7 +1435,8 @@ async function saveJsonBackup(filename,jsonText){
    // registerPlugin() belongs to the imported core module, not this plain HTML runtime.
    const Filesystem=window.Capacitor?.Plugins?.Filesystem;
    if(!Filesystem||typeof Filesystem.writeFile!=='function')throw new Error('filesystem-plugin-unavailable');
-   const saved=await Filesystem.writeFile({path:'Recipe Master Plus/'+filename,data:jsonText,directory:'DOCUMENTS',recursive:true});
+   await Filesystem.mkdir({path:'Recipe Master Plus',directory:'DOCUMENTS',recursive:true});
+   const saved=await Filesystem.writeFile({path:filename,data:jsonText,directory:'DOCUMENTS'});
    if(!saved?.uri)throw new Error('filesystem-uri-missing');
    alert('Архивът е записан успешно в папка Documents/Recipe Master Plus на телефона.');
    return true;
