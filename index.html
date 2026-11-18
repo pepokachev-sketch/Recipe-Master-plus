@@ -1431,7 +1431,10 @@ async function saveJsonBackup(filename,jsonText){
  const isAndroid=window.Capacitor?.isNativePlatform?.()&&window.Capacitor?.getPlatform?.()==='android';
  if(isAndroid){
   try{
-   const Filesystem=window.Capacitor.registerPlugin('Filesystem');
+   // In the plain HTML app, use the native plugin proxy injected by the Capacitor Android bridge.
+   // registerPlugin() is a module API and is not guaranteed on window.Capacitor in this runtime.
+   const Filesystem=window.Capacitor?.Plugins?.Filesystem;
+   if(!Filesystem||typeof Filesystem.writeFile!=='function')throw new Error('filesystem-plugin-unavailable');
    const saved=await Filesystem.writeFile({path:'Recipe Master Plus/'+filename,data:jsonText,directory:'DOCUMENTS',recursive:true});
    if(!saved?.uri)throw new Error('filesystem-uri-missing');
    alert('Архивът е записан успешно в папка Documents/Recipe Master Plus на телефона.');
