@@ -1431,8 +1431,8 @@ async function saveJsonBackup(filename,jsonText){
  const isAndroid=window.Capacitor?.isNativePlatform?.()&&window.Capacitor?.getPlatform?.()==='android';
  if(isAndroid){
   try{
-   // In the plain HTML app, use the native plugin proxy injected by the Capacitor Android bridge.
-   // registerPlugin() is a module API and is not guaranteed on window.Capacitor in this runtime.
+   // Capacitor 8 exposes native plugin proxies through the bridge's Plugins registry.
+   // registerPlugin() belongs to the imported core module, not this plain HTML runtime.
    const Filesystem=window.Capacitor?.Plugins?.Filesystem;
    if(!Filesystem||typeof Filesystem.writeFile!=='function')throw new Error('filesystem-plugin-unavailable');
    const saved=await Filesystem.writeFile({path:'Recipe Master Plus/'+filename,data:jsonText,directory:'DOCUMENTS',recursive:true});
