@@ -76,14 +76,34 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Set APK version 4
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          gradle = Path("android/app/build.gradle")
+          content = gradle.read_text()
+          content, code_count = re.subn(r'(?m)^\s*versionCode\s+\d+\s*
+, '        versionCode 4', content, count=1)
+          content, name_count = re.subn(r'(?m)^\s*versionName\s+"[^"]+"\s*
+, '        versionName "4"', content, count=1)
+          if code_count != 1 or name_count != 1:
+              raise SystemExit("Could not safely set Android versionCode/versionName")
+          gradle.write_text(content)
+          PY
+
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug
 
-      - name: Upload debug APK
+      - name: Name version 4 APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Recipe-Master-Plus-v4.apk
+
+      - name: Upload version 4 APK
         uses: actions/upload-artifact@v4
         with:
-          name: recipe-master-plus-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: recipe-master-plus-v4-apk
+          path: android/app/build/outputs/apk/debug/Recipe-Master-Plus-v4.apk
           if-no-files-found: error
           retention-days: 14
