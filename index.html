@@ -1087,12 +1087,6 @@ function renderRecipes(){
   else $('desktopRecipePreview').innerHTML='<div class="preview-empty"><div class="preview-empty-icon">🍽️</div><h3>Няма рецепти</h3><p>Добави първата рецепта в тази категория.</p></div>';
  }
 }
- if(window.matchMedia('(min-width:701px)').matches){
-  if(previewRecipeId&&arr.some(r=>r.id===previewRecipeId))selectRecipePreview(previewRecipeId);
-  else if(arr.length)selectRecipePreview(arr[0].id);
-  else $('desktopRecipePreview').innerHTML='<div class="preview-empty"><div class="preview-empty-icon">🍽️</div><h3>Няма рецепти</h3><p>Добави първата рецепта в тази категория.</p></div>';
- }
-}
 function parseIngredientLine(line){
  const text=String(line||'').trim();if(!text)return null;
  const m=text.match(/^((?:\d+(?:[.,]\d+)?|\d+\/\d+))\s*(грам(?:а|ове)?|гр\.?|г|килограм(?:а|ове)?|кг|милиграм(?:а|ове)?|мг|милилит(?:ъ|ъ)р(?:а|и)?|мл|лит(?:ъ|ъ)р(?:а|и)?|л|бр\.?|брой(?:ки)?|с\.\s*л\.?|суп(?:ена)?\s+лъж(?:ица|ици)?|ч\.\s*л\.?|чаена\s+лъж(?:ица|ици)?|чаш(?:а|и)|щипк(?:а|и))\s+(.+)$/i);
