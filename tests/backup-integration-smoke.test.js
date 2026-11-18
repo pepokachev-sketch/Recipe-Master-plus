@@ -32,7 +32,7 @@ test('backup export uses native Android Documents storage and keeps browser down
   assert.match(html, /createBackupFilename\('recipe-master-plus-recovery'\)/);
   assert.match(html, /randomUUID/);
   assert.doesNotMatch(html, /writeFile\(\{path:filename/);
-  assert.match(html, /recipe-master-plus-recovery-/);
+  assert.match(html, /createBackupFilename\('recipe-master-plus-recovery'\)/);
   assert.match(html, /URL\.createObjectURL\(blob\)/);
   const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   assert.ok(pkg.dependencies['@capacitor/filesystem']);
