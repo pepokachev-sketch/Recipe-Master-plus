@@ -23,6 +23,9 @@ test('backup export uses native Android Documents storage and keeps browser down
   assert.match(html, /filesystem-plugin-unavailable/);
   assert.match(html, /const BACKUP_DIRECTORY='Recipe Master Plus'/);
   assert.match(html, /Filesystem\.mkdir\(\{path:BACKUP_DIRECTORY,directory:'DOCUMENTS',recursive:true\}\)/);
+  assert.match(html, /catch\(mkdirError\)/);
+  assert.match(html, /Filesystem\.stat\(\{path:BACKUP_DIRECTORY,directory:'DOCUMENTS'\}\)/);
+  assert.match(html, /existingDirectory\.type!=='directory'/);
   assert.match(html, /const relativePath=BACKUP_DIRECTORY\+'\/'\+filename/);
   assert.match(html, /Filesystem\.writeFile\(\{path:relativePath,data:jsonText,directory:'DOCUMENTS',encoding:'utf8',recursive:true\}\)/);
   assert.match(html, /Filesystem\.stat\(\{path:relativePath,directory:'DOCUMENTS'\}\)/);
