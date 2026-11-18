@@ -78,20 +78,10 @@ jobs:
 
       - name: Set APK version 4
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          gradle = Path("android/app/build.gradle")
-          content = gradle.read_text()
-          content, code_count = re.subn(r'(?m)^\s*versionCode\s+\d+\s*
-, '        versionCode 4', content, count=1)
-          content, name_count = re.subn(r'(?m)^\s*versionName\s+"[^"]+"\s*
-, '        versionName "4"', content, count=1)
-          if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not safely set Android versionCode/versionName")
-          gradle.write_text(content)
-          PY
+          sed -i -E 's/^[[:space:]]*versionCode[[:space:]]+[0-9]+[[:space:]]*$/        versionCode 4/' android/app/build.gradle
+          sed -i -E 's/^[[:space:]]*versionName[[:space:]]+"[^"]+"[[:space:]]*$/        versionName "4"/' android/app/build.gradle
+          grep -q 'versionCode 4' android/app/build.gradle
+          grep -q 'versionName "4"' android/app/build.gradle
 
       - name: Build debug APK
         working-directory: android
