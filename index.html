@@ -1440,7 +1440,14 @@ async function saveJsonBackup(filename,jsonText){
    const Filesystem=window.Capacitor?.Plugins?.Filesystem;
    if(!Filesystem||typeof Filesystem.writeFile!=='function')throw new Error('filesystem-plugin-unavailable');
    const relativePath=BACKUP_DIRECTORY+'/'+filename;
-   await Filesystem.mkdir({path:BACKUP_DIRECTORY,directory:'DOCUMENTS',recursive:true});
+   try{
+    await Filesystem.mkdir({path:BACKUP_DIRECTORY,directory:'DOCUMENTS',recursive:true});
+   }catch(mkdirError){
+    // Android SAF may report that the directory already exists even with recursive:true.
+    // Reuse it only after stat confirms that the existing path is a directory.
+    const existingDirectory=await Filesystem.stat({path:BACKUP_DIRECTORY,directory:'DOCUMENTS'});
+    if(!existingDirectory||(existingDirectory.type&&existingDirectory.type!=='directory'))throw mkdirError;
+   }
    const saved=await Filesystem.writeFile({path:relativePath,data:jsonText,directory:'DOCUMENTS',encoding:'utf8',recursive:true});
    if(!saved?.uri)throw new Error('filesystem-uri-missing');
    const info=await Filesystem.stat({path:relativePath,directory:'DOCUMENTS'});
