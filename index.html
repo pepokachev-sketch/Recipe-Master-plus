@@ -1087,7 +1087,6 @@ function renderRecipes(){
   else $('desktopRecipePreview').innerHTML='<div class="preview-empty"><div class="preview-empty-icon">🍽️</div><h3>Няма рецепти</h3><p>Добави първата рецепта в тази категория.</p></div>';
  }
 }
- }).join(''):'<div class="empty"><div style="font-size:34px">📖</div><b>Няма рецепти</b>Добави рецепта или избери друга категория.</div>';
  if(window.matchMedia('(min-width:701px)').matches){
   if(previewRecipeId&&arr.some(r=>r.id===previewRecipeId))selectRecipePreview(previewRecipeId);
   else if(arr.length)selectRecipePreview(arr[0].id);
