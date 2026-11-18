@@ -1039,6 +1039,54 @@ function addRecipeToShopping(id){
   lines.forEach(line=>{const normalized=key(line);if(normalized&&!existing.has(normalized)){shopping.push({id:'shop-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),text:line,done:false});existing.add(normalized);added++}});
   if(!persist())return;renderShop();
   if(!added)alert('Всички продукти от тази рецепта вече са в списъка.');
+ }
+
+function renderRecipes(){
+ const totalCats=[...new Set([...categories,...recipes.map(r=>r.cat).filter(Boolean)])].filter(c=>c!=='Пилешки ястия');
+ $('recipeCount').textContent=recipes.length;
+ $('favoriteCount').textContent=recipes.filter(r=>r.favorite).length;
+ $('categoryCount').textContent=totalCats.length;
+ $('categoryView').hidden=!!selectedCategory;
+ $('categoryRecipesView').hidden=!selectedCategory;
+ const activeLabel=selectedCategory||'__all';
+ $('categoryGrid').innerHTML=[
+  `<button class="category-tile ${selectedCategory==='__all'?'active':''}" type="button" data-category="__all"><span class="category-info"><strong>Всички</strong><small>${recipes.length} рецепти</small></span><span class="category-count">${recipes.length}</span></button>`,
+  ...totalCats.map(c=>{
+   const n=recipes.filter(r=>r.cat===c).length;
+   const photo=customCategories.find(x=>x.name===c)?.photo||categoryPhotos[c]||categoryPhotos[c==='Месни ястия'?'Месни ястия':c==='Домашни колбаси и мезета'?'Домашни колбаси и мезета':c==='Салати и предястия'?'Салати и предястия':''];
+   // Custom category photos may be IndexedDB pointers (idb:...). Resolve them
+   // through the shared image URL map before assigning them to an <img> src.
+   const photoSrc=safeImageUrl(photo);
+   const photoLayer=photoSrc?`<img class="category-photo-bg" src="${esc(photoSrc)}" alt="" aria-hidden="true">`:'';
+   return `<button class="category-tile ${selectedCategory===c?'active':''}" type="button" data-category="${esc(c)}">${photoLayer}<span class="category-info"><strong>${esc(c)}</strong><small>${n} ${n===1?'рецепта':'рецепти'}</small></span><span class="category-count">${n}</span></button>`;
+  })
+ ].join('');
+ $('selectedCategoryTitle').textContent=selectedCategory==='__all'?'Всички рецепти':(selectedCategory||'Всички рецепти');
+ $('selectedCategorySub').textContent=selectedCategory&&selectedCategory!=='__all'?`Рецепти в категория „${selectedCategory}“`:'Цялата ти колекция от рецепти';
+ $('backToCategories').hidden=!selectedCategory;
+ const openedCustom=customCategories.some(c=>c.name===selectedCategory);$('categoryMenuWrap').hidden=!openedCustom;$('categoryActionMenu').hidden=true;$('categoryMenuToggle').setAttribute('aria-expanded','false');
+ const tagSelect=$('tagFilter'),previousTag=tagSelect.value,allTags=[...new Set(recipes.flatMap(r=>Array.isArray(r.tags)?r.tags:(typeof r.tags==='string'?r.tags.split(/[,;\n]/):[])).map(t=>String(t).trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'bg'));
+ tagSelect.innerHTML='<option value="">Всички етикети</option>'+allTags.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');if(allTags.includes(previousTag))tagSelect.value=previousTag;
+ const q=searchNorm($('search').value),onlyFav=$('favoritesOnly').checked,sort=$('sort').value,chosenTag=tagSelect.value;
+ let arr=recipes.filter(r=>(!selectedCategory||selectedCategory==='__all'||r.cat===selectedCategory)&&(!onlyFav||r.favorite)&&(!chosenTag||(Array.isArray(r.tags)?r.tags:(typeof r.tags==='string'?r.tags.split(/[,;\n]/):[])).some(t=>String(t).trim()===chosenTag))&&searchNorm([r.name,r.cat,r.tags,r.ing,r.steps,r.notes,r.desc,r.description].map(v=>Array.isArray(v)?v.join(' '):String(v??'')).join(' ')).includes(q));
+ if(sort==='az')arr.sort((a,b)=>a.name.localeCompare(b.name,'bg'));
+ else if(sort==='time')arr.sort((a,b)=>(Number(a.time)||99999)-(Number(b.time)||99999));
+ else if(sort==='fav')arr.sort((a,b)=>Number(!!b.favorite)-Number(!!a.favorite));
+ else arr.sort((a,b)=>Number(b.created||b.id)-Number(a.created||a.id));
+ $('recipeList').innerHTML=arr.length?arr.map(r=>{
+  const img=safeImageUrl(r.img),catPhoto=categoryPhotos[r.cat]||categoryPhotos['Месни ястия'],count=ingredientLines(r.ing).length;
+  return `<article class="recipe recipe-list-item" data-open="${esc(r.id)}" role="button" tabindex="0" aria-label="Отвори рецептата ${esc(r.name)}">
+   ${img?`<img class="recipe-thumb" src="${esc(img)}" alt="" onerror="this.style.display='none'">`:catPhoto?`<div class="recipe-thumb recipe-thumb-photo" style="background-image:url('${catPhoto}')"></div>`:`<div class="recipe-thumb recipe-thumb-empty">${categoryIcons[r.cat]||'🍽️'}</div>`}
+   <div class="recipe-list-main"><div class="recipe-top"><div class="recipe-list-title"><h3>${esc(r.name)}</h3><span class="tag">${esc(r.cat||'Други')}</span></div>
+   <div class="recipe-row-actions">${r.librarySource?'':`<button class="row-move" title="Премести в друга категория" aria-label="Премести в друга категория" onclick="event.stopPropagation();moveRecipeToCategory('${esc(r.id)}')">⇄</button><button class="row-edit" title="Редактирай рецептата" aria-label="Редактирай рецептата" onclick="event.stopPropagation();editRecipe('${esc(r.id)}')">✎</button><button class="row-delete" title="Изтрий рецептата" aria-label="Изтрий рецептата" onclick="event.stopPropagation();deleteRecipe('${esc(r.id)}')">🗑</button>`}<button class="favorite ${r.favorite?'on':''}" title="Любима рецепта" aria-label="Любима рецепта" onclick="event.stopPropagation();toggleFavorite('${esc(r.id)}')">${r.favorite?'★':'☆'}</button></div></div>
+   <div class="recipe-list-meta">${count?`<span>▤ ${count} продукта</span>`:''}${r.serv?`<span>♟ ${esc(r.serv)} порции</span>`:''}${r.time?`<span>◷ ${esc(r.time)} мин</span>`:''}</div>${(Array.isArray(r.tags)?r.tags:[]).length?`<div class="recipe-tags">${r.tags.map(t=>`<span class="tag recipe-tag">${esc(t)}</span>`).join('')}</div>`:''}</div><span class="recipe-chevron">›</span></article>`;
+ }).join(''):'<div class="empty"><div style="font-size:34px">📖</div><b>Няма рецепти</b>Добави рецепта или избери друга категория.</div>';
+ if(window.matchMedia('(min-width:701px)').matches){
+  if(previewRecipeId&&arr.some(r=>r.id===previewRecipeId))selectRecipePreview(previewRecipeId);
+  else if(arr.length)selectRecipePreview(arr[0].id);
+  else $('desktopRecipePreview').innerHTML='<div class="preview-empty"><div class="preview-empty-icon">🍽️</div><h3>Няма рецепти</h3><p>Добави първата рецепта в тази категория.</p></div>';
+ }
+}
  }).join(''):'<div class="empty"><div style="font-size:34px">📖</div><b>Няма рецепти</b>Добави рецепта или избери друга категория.</div>';
  if(window.matchMedia('(min-width:701px)').matches){
   if(previewRecipeId&&arr.some(r=>r.id===previewRecipeId))selectRecipePreview(previewRecipeId);
