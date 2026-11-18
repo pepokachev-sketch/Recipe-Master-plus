@@ -77,24 +77,24 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Set APK version 4
+      - name: Set APK version 6
         run: |
-          sed -i -E 's/^[[:space:]]*versionCode[[:space:]]+[0-9]+[[:space:]]*$/        versionCode 4/' android/app/build.gradle
-          sed -i -E 's/^[[:space:]]*versionName[[:space:]]+"[^"]+"[[:space:]]*$/        versionName "4"/' android/app/build.gradle
-          grep -q 'versionCode 4' android/app/build.gradle
-          grep -q 'versionName "4"' android/app/build.gradle
+          sed -i -E 's/^[[:space:]]*versionCode[[:space:]]+[0-9]+[[:space:]]*$/        versionCode 6/' android/app/build.gradle
+          sed -i -E 's/^[[:space:]]*versionName[[:space:]]+"[^"]+"[[:space:]]*$/        versionName "6"/' android/app/build.gradle
+          grep -q 'versionCode 6' android/app/build.gradle
+          grep -q 'versionName "6"' android/app/build.gradle
 
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug
 
-      - name: Name version 4 APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Recipe-Master-Plus-v4.apk
+      - name: Name version 6 APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Recipe-Master-Plus-v6.apk
 
-      - name: Upload version 4 APK
+      - name: Upload version 6 APK
         uses: actions/upload-artifact@v4
         with:
-          name: recipe-master-plus-v4-apk
-          path: android/app/build/outputs/apk/debug/Recipe-Master-Plus-v4.apk
+          name: recipe-master-plus-v6-apk
+          path: android/app/build/outputs/apk/debug/Recipe-Master-Plus-v6.apk
           if-no-files-found: error
           retention-days: 14
