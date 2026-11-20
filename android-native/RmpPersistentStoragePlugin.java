@@ -231,6 +231,9 @@ public class RmpPersistentStoragePlugin extends Plugin {
                         call.resolve(backupState);
                         return;
                     }
+                    if (Boolean.TRUE.equals(backupState.getBool("hasAnyData"))) {
+                        throw new IOException("recovery-database-state-is-incomplete");
+                    }
                 }
             }
             call.resolve(result);
