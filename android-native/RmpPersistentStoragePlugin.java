@@ -238,6 +238,99 @@ public class RmpPersistentStoragePlugin extends Plugin {
         }
     }
 
+    private String imageExtension(String mimeType) {
+        if ("image/jpeg".equalsIgnoreCase(mimeType)) return "jpg";
+        if ("image/png".equalsIgnoreCase(mimeType)) return "png";
+        if ("image/webp".equalsIgnoreCase(mimeType)) return "webp";
+        if ("image/gif".equalsIgnoreCase(mimeType)) return "gif";
+        throw new IllegalArgumentException("unsupported-image-type");
+    }
+
+    @PluginMethod
+    public void writeImage(PluginCall call) {
+        try {
+            String id = call.getString("id");
+            String dataUrl = call.getString("dataUrl");
+            if (id == null || !id.matches("[A-Za-z0-9._:-]{1,100}")) throw new IllegalArgumentException("invalid-image-id");
+            if (dataUrl == null || !dataUrl.matches("(?i)^data:image/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$")) {
+                throw new IllegalArgumentException("invalid-image-data-url");
+            }
+            int comma = dataUrl.indexOf(',');
+            String header = dataUrl.substring(0, comma);
+            String mimeType = header.substring(5, header.indexOf(';')).toLowerCase();
+            String extension = imageExtension(mimeType);
+            byte[] bytes = android.util.Base64.decode(dataUrl.substring(comma + 1), android.util.Base64.DEFAULT);
+            if (bytes.length == 0) throw new IllegalArgumentException("empty-image");
+            File target = safeFile("Images/" + id + "." + extension);
+            File temporary = new File(target.getParentFile(), target.getName() + ".tmp");
+            try (FileOutputStream output = new FileOutputStream(temporary)) {
+                output.write(bytes);
+                output.flush();
+                output.getFD().sync();
+            }
+            File backup = new File(target.getParentFile(), target.getName() + ".bak");
+            if (backup.exists() && !backup.delete()) throw new IOException("cannot-clear-image-backup");
+            boolean hadTarget = target.exists();
+            if (hadTarget && !target.renameTo(backup)) throw new IOException("cannot-stage-existing-image");
+            if (!temporary.renameTo(target)) {
+                if (hadTarget) backup.renameTo(target);
+                temporary.delete();
+                throw new IOException("image-atomic-rename-failed");
+            }
+            if (hadTarget) backup.delete();
+            String[] extensions = {"jpg", "png", "webp", "gif"};
+            for (String other : extensions) {
+                if (!other.equals(extension)) {
+                    File stale = new File(target.getParentFile(), id + "." + other);
+                    if (stale.exists()) stale.delete();
+                }
+            }
+            JSObject result = new JSObject();
+            result.put("written", true);
+            result.put("bytes", bytes.length);
+            result.put("mimeType", mimeType);
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("persistent-image-write-failed: " + error.getMessage(), error);
+        }
+    }
+
+    @PluginMethod
+    public void readImage(PluginCall call) {
+        try {
+            String id = call.getString("id");
+            if (id == null || !id.matches("[A-Za-z0-9._:-]{1,100}")) throw new IllegalArgumentException("invalid-image-id");
+            String[][] types = {
+                {"jpg", "image/jpeg"}, {"png", "image/png"}, {"webp", "image/webp"}, {"gif", "image/gif"}
+            };
+            File file = null;
+            String mimeType = null;
+            for (String[] type : types) {
+                File candidate = safeFile("Images/" + id + "." + type[0]);
+                if (candidate.isFile()) { file = candidate; mimeType = type[1]; break; }
+            }
+            JSObject result = new JSObject();
+            if (file == null) {
+                result.put("found", false);
+                call.resolve(result);
+                return;
+            }
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            try (FileInputStream input = new FileInputStream(file)) {
+                byte[] buffer = new byte[32768];
+                int count;
+                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            }
+            String encoded = android.util.Base64.encodeToString(output.toByteArray(), android.util.Base64.NO_WRAP);
+            result.put("found", true);
+            result.put("dataUrl", "data:" + mimeType + ";base64," + encoded);
+            result.put("bytes", file.length());
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("persistent-image-read-failed: " + error.getMessage(), error);
+        }
+    }
+
     @PluginMethod
     public void readText(PluginCall call) {
         try {
