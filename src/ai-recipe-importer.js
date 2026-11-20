@@ -19,6 +19,7 @@ export function validateRecipePackage(input) {
   if (!name) throw new Error("recipe-import-name-required");
   const ingredients = source.ingredients;
   if (!Array.isArray(ingredients) || ingredients.length > 250) throw new TypeError("recipe-import-invalid-ingredients");
+  if (ingredients.filter(row => row && typeof row === "object" && !Array.isArray(row) && row.base === true).length > 1) throw new Error("recipe-import-multiple-base-ingredients");
   const rows = ingredients.map((row, index) => {
     if (!row || typeof row !== "object" || Array.isArray(row)) throw new TypeError("recipe-import-invalid-ingredient-" + index);
     const amount = text(row.amount, 60, "ingredient-amount");
@@ -30,7 +31,6 @@ export function validateRecipePackage(input) {
     // to scaling manually later by changing the ingredient flags in the editor.
     return { id: "ing_import_" + index, amount, unit, name: ingredientName, scale: false, base: false, excludeBaseScaling: true, manualBaseOverride: false, scaleBase: false };
   });
-  if (rows.filter(row => row.base).length > 1) throw new Error("recipe-import-multiple-base-ingredients");
   const rawSteps = source.steps;
   const steps = Array.isArray(rawSteps) ? rawSteps.map(x => text(x, 2000, "step")).filter(Boolean).join("\n") : text(rawSteps, 30000, "steps");
   const tags = Array.isArray(source.tags) ? [...new Set(source.tags.map(x => text(x, 50, "tag")).filter(Boolean))].slice(0, 30) : [];
