@@ -179,21 +179,24 @@ public class RmpPersistentStoragePlugin extends Plugin {
 
     private JSObject readStateFromDatabase(SQLiteDatabase db) throws Exception {
         JSObject result = new JSObject();
-        boolean found = true;
+        boolean allFound = true;
+        boolean anyFound = false;
         for (String collection : COLLECTIONS) {
             Cursor cursor = db.rawQuery("SELECT payload FROM app_state WHERE collection = ?", new String[]{collection});
             if (!cursor.moveToFirst()) {
-                found = false;
+                allFound = false;
                 cursor.close();
-                break;
+                continue;
             }
+            anyFound = true;
             String payload = cursor.getString(0);
             cursor.close();
             JSONArray array = new JSONArray(payload);
             result.put(collection, new JSArray(array.toString()));
         }
-        result.put("found", found);
-        if (found) {
+        result.put("found", allFound);
+        result.put("hasAnyData", anyFound);
+        if (allFound) {
             Cursor meta = db.rawQuery("SELECT value FROM metadata WHERE key = 'revision'", null);
             if (meta.moveToFirst()) result.put("revision", meta.getString(0));
             meta.close();
@@ -212,6 +215,9 @@ public class RmpPersistentStoragePlugin extends Plugin {
             db = null;
 
             if (!Boolean.TRUE.equals(result.getBool("found"))) {
+                if (Boolean.TRUE.equals(result.getBool("hasAnyData"))) {
+                    throw new IOException("incomplete-primary-database-state");
+                }
                 File root = ensureRoot();
                 File backup = new File(new File(root, "Backups"), "recipe-master-plus-recovery.db");
                 if (backup.isFile()) {
