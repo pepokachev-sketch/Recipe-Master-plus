@@ -102,6 +102,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: recipe-master-plus-v8-apk
-          path: android/app/build/outputs/apk/debug/Recipe-Master-Plus-v7.apk
+          path: android/app/build/outputs/apk/debug/Recipe-Master-Plus-v8.apk
           if-no-files-found: error
           retention-days: 14
