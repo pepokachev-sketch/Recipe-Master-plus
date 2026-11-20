@@ -129,7 +129,7 @@ public class RmpPersistentStoragePlugin extends Plugin {
 
     private File safeFile(String relativePath) throws IOException {
         if (relativePath == null || relativePath.trim().isEmpty()) throw new IllegalArgumentException("path-required");
-        if (relativePath.startsWith("/") || relativePath.contains("\\") || relativePath.contains(":")) {
+        if (relativePath.startsWith("/") || relativePath.contains("\\")) {
             throw new IllegalArgumentException("invalid-relative-path");
         }
         File root = ensureRoot();
