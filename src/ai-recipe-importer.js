@@ -25,7 +25,10 @@ export function validateRecipePackage(input) {
     const unit = text(row.unit, 40, "ingredient-unit");
     const ingredientName = text(row.name, 180, "ingredient-name");
     if (!amount && !unit && !ingredientName) throw new Error("recipe-import-empty-ingredient-" + index);
-    return { id: "ing_import_" + index, amount, unit, name: ingredientName, scale: row.scale !== false, base: row.base === true, scaleBase: row.scaleBase !== false };
+    // Imported quantities are authoritative source data. Do not let the editor's portion
+    // or main-ingredient scaling silently rewrite them after import. Users can opt in
+    // to scaling manually later by changing the ingredient flags in the editor.
+    return { id: "ing_import_" + index, amount, unit, name: ingredientName, scale: false, base: false, excludeBaseScaling: true, manualBaseOverride: false, scaleBase: false };
   });
   if (rows.filter(row => row.base).length > 1) throw new Error("recipe-import-multiple-base-ingredients");
   const rawSteps = source.steps;
