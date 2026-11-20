@@ -37,17 +37,17 @@ test('restricts image paths to validated IDs under the Images directory', () => 
 test('writes and verifies portable image files through the native bridge', async () => {
   const files = new Map();
   const plugin = {
-    writeText: async ({ path, content }) => files.set(path, content),
-    readText: async ({ path }) => files.has(path) ? { found: true, content: files.get(path) } : { found: false }
+    writeImage: async ({ id, dataUrl }) => files.set(id, dataUrl),
+    readImage: async ({ id }) => files.has(id) ? { found: true, dataUrl: files.get(id) } : { found: false }
   };
   const storage = { granted: true, plugin };
   const dataUrl = 'data:image/png;base64,aGVsbG8=';
-  assert.equal(await writePersistentImage(storage, 'img-1', dataUrl), 'Images/img-1.txt');
+  assert.equal(await writePersistentImage(storage, 'img-1', dataUrl), 'Images/img-1');
   assert.equal(await readPersistentImage(storage, 'img-1'), dataUrl);
 });
 
 test('rejects corrupt or unavailable persistent image files', async () => {
-  const storage = { granted: true, plugin: { readText: async () => ({ found: true, content: 'not-an-image' }) } };
+  const storage = { granted: true, plugin: { readImage: async () => ({ found: true, dataUrl: 'not-an-image' }) } };
   await assert.rejects(readPersistentImage(storage, 'img-2'), /persistent-image-file-invalid/);
   await assert.rejects(readPersistentImage({ granted: false }, 'img-2'), /persistent-storage-not-granted/);
 });
