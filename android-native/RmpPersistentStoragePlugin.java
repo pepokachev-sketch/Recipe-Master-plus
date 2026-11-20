@@ -243,7 +243,7 @@ public class RmpPersistentStoragePlugin extends Plugin {
             JSObject backupState;
             try { backupState = readStateFromDatabase(backupDb); }
             finally { backupDb.close(); }
-            if (!backupState.getBool("found", false)) throw new IOException("recovery-database-has-no-state");
+            if (!Boolean.TRUE.equals(backupState.getBool("found"))) throw new IOException("recovery-database-has-no-state");
             copyFileAtomic(backup, databaseFile());
             backupState.put("recoveredFromBackup", true);
             call.resolve(backupState);
@@ -332,64 +332,6 @@ public class RmpPersistentStoragePlugin extends Plugin {
         } finally {
             if (db != null) db.close();
         }
-    }
-
-    @PluginMethod
-    public void saveState(PluginCall call) {
-        SQLiteDatabase db = null;
-        try {
-            String[] payloads = new String[COLLECTIONS.length];
-            for (int i = 0; i < COLLECTIONS.length; i++) {
-                JSArray value = call.getArray(COLLECTIONS[i]);
-                if (value == null) throw new IllegalArgumentException("missing-collection:" + COLLECTIONS[i]);
-                JSONArray checked = new JSONArray(value.toString());
-                payloads[i] = checked.toString();
-            }
-
-            db = openDatabase();
-            db.beginTransaction();
-            try {
-                SQLiteStatement statement = db.compileStatement(
-                    "INSERT OR REPLACE INTO app_state(collection, payload) VALUES(?, ?)"
-                );
-                for (int i = 0; i < COLLECTIONS.length; i++) {
-                    statement.clearBindings();
-                    statement.bindString(1, COLLECTIONS[i]);
-                    statement.bindString(2, payloads[i]);
-                    statement.executeInsert();
-                }
-                statement.close();
-
-                long revision = 1;
-                Cursor cursor = db.rawQuery("SELECT value FROM metadata WHERE key = 'revision'", null);
-                if (cursor.moveToFirst()) {
-                    try { revision = Long.parseLong(cursor.getString(0)) + 1; }
-                    catch (NumberFormatException ignored) { revision = 1; }
-                }
-                cursor.close();
-                db.execSQL("INSERT OR REPLACE INTO metadata(key, value) VALUES('revision', ?)", new Object[]{String.valueOf(revision)});
-                db.execSQL("INSERT OR REPLACE INTO metadata(key, value) VALUES('updatedAt', ?)", new Object[]{String.valueOf(System.currentTimeMillis())});
-                db.setTransactionSuccessful();
-                JSObject result = new JSObject();
-                result.put("saved", true);
-                result.put("revision", revision);
-                call.resolve(result);
-            } finally {
-                db.endTransaction();
-            }
-        } catch (Exception error) {
-            call.reject("persistent-database-write-failed: " + error.getMessage(), error);
-        } finally {
-            if (db != null) db.close();
-        }
-    }
-
-    private String imageExtension(String mimeType) {
-        if ("image/jpeg".equalsIgnoreCase(mimeType)) return "jpg";
-        if ("image/png".equalsIgnoreCase(mimeType)) return "png";
-        if ("image/webp".equalsIgnoreCase(mimeType)) return "webp";
-        if ("image/gif".equalsIgnoreCase(mimeType)) return "gif";
-        throw new IllegalArgumentException("unsupported-image-type");
     }
 
     @PluginMethod
