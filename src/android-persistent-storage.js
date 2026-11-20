@@ -25,7 +25,15 @@ export function validatePersistentState(value) {
   const state = {};
   for (const name of COLLECTIONS) {
     if (!Array.isArray(value[name])) throw new TypeError('persistent-collection-invalid:' + name);
+    if (value[name].some(record => !record || typeof record !== 'object' || Array.isArray(record))) {
+      throw new TypeError('persistent-record-invalid:' + name);
+    }
     state[name] = value[name];
+  }
+  if (state.recipes.some(record => typeof record.name !== 'string')) throw new TypeError('persistent-recipe-invalid');
+  if (state.shopping.some(record => typeof record.text !== 'string')) throw new TypeError('persistent-shopping-invalid');
+  if (state.customCategories.some(record => typeof record.name !== 'string' || !record.name.trim())) {
+    throw new TypeError('persistent-category-invalid');
   }
   return state;
 }
