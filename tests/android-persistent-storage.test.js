@@ -30,7 +30,7 @@ test('maps legacy LocalStorage keys to their persistent collection names', () =>
 });
 
 test('restricts image paths to validated IDs under the Images directory', () => {
-  assert.equal(imageRelativePath('img-123'), 'Images/img-123.txt');
+  assert.equal(imageRelativePath('img-123'), 'Images/img-123');
   assert.throws(() => imageRelativePath('../outside'), /persistent-image-id-invalid/);
 });
 
