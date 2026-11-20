@@ -177,40 +177,79 @@ public class RmpPersistentStoragePlugin extends Plugin {
         return db;
     }
 
+    private JSObject readStateFromDatabase(SQLiteDatabase db) throws Exception {
+        JSObject result = new JSObject();
+        boolean found = true;
+        for (String collection : COLLECTIONS) {
+            Cursor cursor = db.rawQuery("SELECT payload FROM app_state WHERE collection = ?", new String[]{collection});
+            if (!cursor.moveToFirst()) {
+                found = false;
+                cursor.close();
+                break;
+            }
+            String payload = cursor.getString(0);
+            cursor.close();
+            JSONArray array = new JSONArray(payload);
+            result.put(collection, new JSArray(array.toString()));
+        }
+        result.put("found", found);
+        if (found) {
+            Cursor meta = db.rawQuery("SELECT value FROM metadata WHERE key = 'revision'", null);
+            if (meta.moveToFirst()) result.put("revision", meta.getString(0));
+            meta.close();
+        }
+        return result;
+    }
+
     @PluginMethod
     public void loadState(PluginCall call) {
         SQLiteDatabase db = null;
-        Cursor cursor = null;
+        Exception primaryError = null;
         try {
             db = openDatabase();
-            JSObject result = new JSObject();
-            boolean found = true;
-            for (String collection : COLLECTIONS) {
-                cursor = db.rawQuery("SELECT payload FROM app_state WHERE collection = ?", new String[]{collection});
-                if (!cursor.moveToFirst()) {
-                    found = false;
-                    cursor.close();
-                    cursor = null;
-                    break;
+            JSObject result = readStateFromDatabase(db);
+            db.close();
+            db = null;
+
+            if (!result.getBool("found", false)) {
+                File root = ensureRoot();
+                File backup = new File(new File(root, "Backups"), "recipe-master-plus-recovery.db");
+                if (backup.isFile()) {
+                    SQLiteDatabase backupDb = SQLiteDatabase.openDatabase(backup.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
+                    JSObject backupState;
+                    try { backupState = readStateFromDatabase(backupDb); }
+                    finally { backupDb.close(); }
+                    if (backupState.getBool("found", false)) {
+                        copyFileAtomic(backup, databaseFile());
+                        backupState.put("recoveredFromBackup", true);
+                        call.resolve(backupState);
+                        return;
+                    }
                 }
-                String payload = cursor.getString(0);
-                cursor.close();
-                cursor = null;
-                JSONArray array = new JSONArray(payload);
-                result.put(collection, new JSArray(array.toString()));
-            }
-            result.put("found", found);
-            if (found) {
-                Cursor meta = db.rawQuery("SELECT value FROM metadata WHERE key = 'revision'", null);
-                if (meta.moveToFirst()) result.put("revision", meta.getString(0));
-                meta.close();
             }
             call.resolve(result);
+            return;
         } catch (Exception error) {
-            call.reject("persistent-database-read-failed: " + error.getMessage(), error);
+            primaryError = error;
         } finally {
-            if (cursor != null) cursor.close();
             if (db != null) db.close();
+        }
+
+        try {
+            File root = ensureRoot();
+            File backup = new File(new File(root, "Backups"), "recipe-master-plus-recovery.db");
+            if (!backup.isFile()) throw new IOException("recovery-database-not-found");
+            SQLiteDatabase backupDb = SQLiteDatabase.openDatabase(backup.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
+            JSObject backupState;
+            try { backupState = readStateFromDatabase(backupDb); }
+            finally { backupDb.close(); }
+            if (!backupState.getBool("found", false)) throw new IOException("recovery-database-has-no-state");
+            copyFileAtomic(backup, databaseFile());
+            backupState.put("recoveredFromBackup", true);
+            call.resolve(backupState);
+        } catch (Exception backupError) {
+            if (primaryError != null) primaryError.addSuppressed(backupError);
+            call.reject("persistent-database-read-failed; recovery copy unavailable: " + backupError.getMessage(), primaryError != null ? primaryError : backupError);
         }
     }
 
