@@ -776,11 +776,22 @@ dialog#detailDialog #wakeLockToggle[aria-pressed="true"]::after{
  </div>
 </dialog>
 <script type="module">
-import { preparePersistentStorage } from './src/android-persistent-storage.js';
+import { getPersistentStoragePlugin, preparePersistentStorage } from './src/android-persistent-storage.js';
 
 (async () => {
   try {
-    const storage = await preparePersistentStorage();
+    const nativePlugin = getPersistentStoragePlugin();
+    if (nativePlugin) {
+      try {
+        const permission = await nativePlugin.checkAccess();
+        if (!permission?.granted) {
+          alert('Recipe Master Plus трябва да съхранява базата и снимките в общата памет на телефона, за да останат след деинсталиране. Следващият екран е настройката „Allow access to manage all files“. Без това разрешение приложението ще продължи да работи, но няма да може да възстанови автоматично данните след деинсталиране.');
+        }
+      } catch (permissionCheckError) {
+        console.warn('Recipe Master Plus: storage permission pre-check failed', permissionCheckError);
+      }
+    }
+    const storage = await preparePersistentStorage(nativePlugin);
     window.__RMP_PERSISTENT_STORAGE__ = storage;
     window.__RMP_BOOT_STATE__ = storage.state;
     if (storage.supported && !storage.granted) {
