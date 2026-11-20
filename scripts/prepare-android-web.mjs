@@ -18,6 +18,7 @@ await Promise.all([
   'sw.js',
   'recipes_library.json',
   'src/backup-image-adapter.js',
+  'src/android-persistent-storage.js',
   'src/ai-recipe-importer.js',
   'icons/icon-512.svg',
   'icons/odin-wolf.svg'
