@@ -29,7 +29,7 @@ export function collectionForLegacyKey(key) {
 export function imageRelativePath(id) {
   const safeId = String(id || '');
   if (!/^[A-Za-z0-9._:-]{1,100}$/.test(safeId)) throw new TypeError('persistent-image-id-invalid');
-  return 'Images/' + safeId + '.txt';
+  return 'Images/' + safeId;
 }
 
 export async function preparePersistentStorage(plugin = getPersistentStoragePlugin(), options = {}) {
@@ -68,12 +68,13 @@ export async function writePersistentImage(storage, id, dataUrl) {
 
 export async function readPersistentImage(storage, id) {
   if (!storage?.granted || !storage.plugin) return null;
-  const result = await storage.plugin.readText({ path: imageRelativePath(id) });
-  if (!result?.found || typeof result.content !== 'string') return null;
-  if (!/^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(result.content)) {
+  imageRelativePath(id);
+  const result = await storage.plugin.readImage({ id: String(id) });
+  if (!result?.found || typeof result.dataUrl !== 'string') return null;
+  if (!/^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(result.dataUrl)) {
     throw new Error('persistent-image-file-invalid:' + id);
   }
-  return result.content;
+  return result.dataUrl;
 }
 
 export async function savePersistentState(storage, inputState) {
