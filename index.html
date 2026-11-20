@@ -1417,10 +1417,10 @@ async function findRecipePhoto(r,force=false){
   console.warn('Recipe Master Plus: автоматичното търсене на снимка не успя',error,{failures});
  }
 }
-let detailScaleMode='servings',detailBaseAmount='';
+let detailScaleMode='servings',detailBaseAmount='',detailServingsTarget=1;
 function renderRecipeDetail(){
  const r=activeRecipe;if(!r)return;
- const baseServ=Math.max(1,Number(r.serv)||1),serv=Math.max(1,Number($('detailServings')?.value)||baseServ);
+ const baseServ=Math.max(1,Number(r.serv)||1),serv=Math.max(1,Number(detailServingsTarget)||baseServ);
  const ingredientRows=getRecipeIngredients(r),baseRow=findBaseIngredient(ingredientRows),steps=ingredientLines(r.steps);
  if(baseRow&&!detailBaseAmount)detailBaseAmount=baseRow.amount;
  const factor=detailScaleMode==='base'&&baseRow?baseIngredientFactor(ingredientRows,detailBaseAmount):serv/baseServ;
@@ -1447,7 +1447,7 @@ function renderRecipeDetail(){
   $('detailContent').querySelectorAll('.detail-ingredients li span').forEach((el,i)=>{el.textContent=lines[i]||''});
   const coef=$('detailScaleFactor');if(coef)coef.textContent=(result.valid?factor.toFixed(3).replace('.',',')+' ×':'Въведи стойност > 0');
  };
- if($('detailServings'))$('detailServings').addEventListener('input',updateDetailScale);
+ if($('detailServings'))$('detailServings').addEventListener('input',()=>{detailServingsTarget=Number($('detailServings').value)||baseServ;updateDetailScale()});
  if($('detailBaseAmount'))$('detailBaseAmount').addEventListener('input',()=>{detailBaseAmount=$('detailBaseAmount').value;updateDetailScale()});
  $('detailContent').querySelectorAll('.detail-ingredients input').forEach(x=>x.addEventListener('change',()=>x.closest('li').classList.toggle('checked',x.checked)));
  bindRecipePhotoControls(r);
@@ -1456,7 +1456,7 @@ function renderRecipeDetail(){
  if($('prevCook'))$('prevCook').onclick=()=>{cookStep=Math.max(0,cookStep-1);renderRecipeDetail()};
  if($('nextCook'))$('nextCook').onclick=()=>{if(cookStep>=steps.length-1){cookMode=false;cookStep=0}else cookStep++;renderRecipeDetail()};
 }
-function openRecipe(id){activeRecipe=recipes.find(x=>x.id===id);if(!activeRecipe)return;detailScaleMode='servings';detailBaseAmount='';cookMode=false;cookStep=0;renderRecipeDetail();history.pushState({rmpView:'recipe',recipeId:id},'',location.href);$('detailDialog').showModal()}
+function openRecipe(id){activeRecipe=recipes.find(x=>x.id===id);if(!activeRecipe)return;detailScaleMode='servings';detailBaseAmount='';detailServingsTarget=Math.max(1,Number(activeRecipe.serv)||1);cookMode=false;cookStep=0;renderRecipeDetail();history.pushState({rmpView:'recipe',recipeId:id},'',location.href);$('detailDialog').showModal()}
 function closeRecipeDetail(){if($('detailDialog').open)$('detailDialog').close();if(history.state?.rmpView==='recipe')history.back()}
 $('detailDialog').addEventListener('cancel',e=>{e.preventDefault();closeRecipeDetail()});
 $('detailEdit').onclick=()=>{const id=activeRecipe?.id;if($('detailDialog').open)$('detailDialog').close();if(id)editRecipe(id)};
