@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feature/android-capacitor
+      - feature/android-hybrid-storage-v7
     paths:
       - 'index.html'
       - 'manifest.webmanifest'
@@ -16,6 +17,8 @@ on:
       - 'package.json'
       - 'capacitor.config.json'
       - 'scripts/prepare-android-web.mjs'
+      - 'scripts/install-android-persistent-storage.mjs'
+      - 'android-native/**'
       - 'tests/**'
       - '.github/workflows/android-apk.yml'
 
@@ -77,10 +80,13 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Set APK version 6
+      - name: Install persistent SQLite and public-files storage
+        run: node scripts/install-android-persistent-storage.mjs
+
+      - name: Set APK version 7
         run: |
-          sed -i -E 's/^[[:space:]]*versionCode[[:space:]]+[0-9]+[[:space:]]*$/        versionCode 6/' android/app/build.gradle
-          sed -i -E 's/^[[:space:]]*versionName[[:space:]]+"[^"]+"[[:space:]]*$/        versionName "6"/' android/app/build.gradle
+          sed -i -E 's/^[[:space:]]*versionCode[[:space:]]+[0-9]+[[:space:]]*$/        versionCode 7/' android/app/build.gradle
+          sed -i -E 's/^[[:space:]]*versionName[[:space:]]+"[^"]+"[[:space:]]*$/        versionName "7"/' android/app/build.gradle
           grep -q 'versionCode 6' android/app/build.gradle
           grep -q 'versionName "6"' android/app/build.gradle
 
@@ -88,13 +94,13 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug
 
-      - name: Name version 6 APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Recipe-Master-Plus-v6.apk
+      - name: Name version 7 APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Recipe-Master-Plus-v7.apk
 
-      - name: Upload version 6 APK
+      - name: Upload version 7 APK
         uses: actions/upload-artifact@v4
         with:
-          name: recipe-master-plus-v6-apk
+          name: recipe-master-plus-v7-apk
           path: android/app/build/outputs/apk/debug/Recipe-Master-Plus-v6.apk
           if-no-files-found: error
           retention-days: 14
