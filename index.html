@@ -842,19 +842,24 @@ let lastCommittedState={recipes:cloneState(recipes),meatNotes:cloneState(meatNot
 const rmpPersistentStorage=window.__RMP_PERSISTENT_STORAGE__||null;
 let rmpNativeCommitQueue=Promise.resolve();
 let rmpNativeCommitSequence=0;
-function rmpNativeStateSnapshot(){
+function rmpNativeFullStateSnapshot(){
  return {
-  recipes:cloneState(recipes.filter(r=>!r.librarySource)),
+  recipes:cloneState(recipes),
   meatNotes:cloneState(meatNotes),
   shopping:cloneState(shopping),
   customCategories:cloneState(customCategories)
  };
 }
-function rmpQueueNativeStateSave(snapshot){
+function rmpNativeStateSnapshot(){
+ const state=rmpNativeFullStateSnapshot();
+ state.recipes=state.recipes.filter(r=>!r.librarySource);
+ return state;
+}
+function rmpQueueNativeStateSave(snapshot,fullSnapshot){
  const sequence=++rmpNativeCommitSequence;
  const operation=rmpNativeCommitQueue.then(()=>rmpPersistentStorage.plugin.saveState(snapshot));
  rmpNativeCommitQueue=operation.then(result=>{
-  lastCommittedState={recipes:cloneState(snapshot.recipes),meatNotes:cloneState(snapshot.meatNotes),shopping:cloneState(snapshot.shopping),customCategories:cloneState(snapshot.customCategories),categories:[...categories]};
+  lastCommittedState={recipes:cloneState(fullSnapshot.recipes),meatNotes:cloneState(fullSnapshot.meatNotes),shopping:cloneState(fullSnapshot.shopping),customCategories:cloneState(fullSnapshot.customCategories),categories:[...categories]};
   return result;
  }).catch(error=>{
   console.error('Recipe Master Plus: постоянната SQLite база не прие промените',error);
@@ -864,6 +869,7 @@ function rmpQueueNativeStateSave(snapshot){
    shopping=cloneState(lastCommittedState.shopping);
    customCategories=cloneState(lastCommittedState.customCategories);
    categories=[...lastCommittedState.categories];
+   if(activeRecipe)activeRecipe=recipes.find(r=>r.id===activeRecipe.id)||null;
    try{if($('recipeCount'))renderRecipes();if($('meatList'))renderMeat();if($('shopList'))renderShop();if($('customCategoryList'))renderCustomCategoryList();if(activeRecipe&&$('detailDialog')?.open)renderRecipeDetail()}catch(renderError){console.error('Recipe Master Plus: rollback render failed',renderError)}
    alert('Не успях да запазя промените в постоянната база данни на телефона. Върнах последното успешно записано състояние. Не деинсталирай приложението, докато проблемът не бъде отстранен.');
   }
@@ -889,11 +895,12 @@ async function rmpReadPersistentImage(id){
 async function rmpInitializeNativeStorage(){
  if(!rmpPersistentStorage?.granted||!rmpPersistentStorage.plugin||rmpPersistentStorage.active)return false;
  if(storageReadErrors.length)throw new Error('legacy-storage-invalid; refusing automatic migration');
- const snapshot=rmpNativeStateSnapshot();
+ const fullSnapshot=rmpNativeFullStateSnapshot();
+ const snapshot={...fullSnapshot,recipes:fullSnapshot.recipes.filter(r=>!r.librarySource)};
  const result=await rmpPersistentStorage.plugin.saveState(snapshot);
  if(!result?.saved)throw new Error('initial-sqlite-migration-not-confirmed');
  rmpPersistentStorage.active=true;
- lastCommittedState={recipes:cloneState(snapshot.recipes),meatNotes:cloneState(snapshot.meatNotes),shopping:cloneState(snapshot.shopping),customCategories:cloneState(snapshot.customCategories),categories:[...categories]};
+ lastCommittedState={recipes:cloneState(fullSnapshot.recipes),meatNotes:cloneState(fullSnapshot.meatNotes),shopping:cloneState(fullSnapshot.shopping),customCategories:cloneState(fullSnapshot.customCategories),categories:[...categories]};
  console.info('Recipe Master Plus: legacy data migrated to public SQLite database',result.revision);
  return true;
 }
@@ -917,7 +924,7 @@ function persist(){
   return false;
  }
  if(rmpPersistentStorage?.active){
-  return rmpQueueNativeStateSave(rmpNativeStateSnapshot());
+  return rmpQueueNativeStateSave(rmpNativeStateSnapshot(),rmpNativeFullStateSnapshot());
  }
  const keys=['myrecipes_v1','mymeat_v1','myshop_v1','myrecipes_customcats_v1'];
  let previous=null;
@@ -1765,10 +1772,13 @@ async function syncCentralRecipeLibrary(){
  }catch(error){console.warn('Recipe Master Plus: централната библиотека не е достъпна; приложението продължава с локалните рецепти и кеша на браузъра.',error)}
 }
 (async()=>{
- try{await rmpHydrateImages();console.info('Recipe Master Plus: изображенията са заредени от локалното и постоянното хранилище.')}
+ let imageHydrationSucceeded=false;
+ try{await rmpHydrateImages();imageHydrationSucceeded=true;console.info('Recipe Master Plus: изображенията са заредени от локалното и постоянното хранилище.')}
  catch(error){console.error('Recipe Master Plus: миграцията/зареждането на изображенията не завърши',error);alert('Част от снимките не бяха прехвърлени. Оригиналните данни са запазени. Не деинсталирай приложението, докато не проверим снимките.')}
- try{await rmpInitializeNativeStorage();}
- catch(error){console.error('Recipe Master Plus: първоначалното прехвърляне към SQLite не завърши',error);alert('Не успях да завърша миграцията към постоянната база на телефона. Старите данни не са изтрити. Не деинсталирай приложението и направи резервно копие.')}
+ if(imageHydrationSucceeded){
+  try{await rmpInitializeNativeStorage();}
+  catch(error){console.error('Recipe Master Plus: първоначалното прехвърляне към SQLite не завърши',error);alert('Не успях да завърша миграцията към постоянната база на телефона. Старите данни не са изтрити. Не деинсталирай приложението и направи резервно копие.')}
+ }
  if(rmpPersistentStorage?.granted&&!rmpPersistentStorage.active)console.warn('Recipe Master Plus: persistent SQLite is not active; using legacy browser storage.');
  await syncCentralRecipeLibrary();
  renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
