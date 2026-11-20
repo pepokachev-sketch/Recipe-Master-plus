@@ -871,6 +871,7 @@ function rmpQueueNativeStateSave(snapshot,fullSnapshot){
  const operation=rmpNativeCommitQueue.then(()=>rmpPersistentStorage.plugin.saveState(snapshot));
  rmpNativeCommitQueue=operation.then(result=>{
   lastCommittedState={recipes:cloneState(fullSnapshot.recipes),meatNotes:cloneState(fullSnapshot.meatNotes),shopping:cloneState(fullSnapshot.shopping),customCategories:cloneState(fullSnapshot.customCategories),categories:[...categories]};
+  if(result?.backupWritten===false)console.warn('Recipe Master Plus: SQLite state saved, but the recovery database copy could not be refreshed.');
   return result;
  }).catch(error=>{
   console.error('Recipe Master Plus: постоянната SQLite база не прие промените',error);
@@ -912,6 +913,7 @@ async function rmpInitializeNativeStorage(){
  if(!result?.saved)throw new Error('initial-sqlite-migration-not-confirmed');
  rmpPersistentStorage.active=true;
  lastCommittedState={recipes:cloneState(fullSnapshot.recipes),meatNotes:cloneState(fullSnapshot.meatNotes),shopping:cloneState(fullSnapshot.shopping),customCategories:cloneState(fullSnapshot.customCategories),categories:[...categories]};
+ if(result?.backupWritten===false)console.warn('Recipe Master Plus: SQLite migration succeeded, but the recovery database copy could not be created.');
  console.info('Recipe Master Plus: legacy data migrated to public SQLite database',result.revision);
  return true;
 }
