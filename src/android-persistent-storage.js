@@ -59,11 +59,11 @@ export async function writePersistentImage(storage, id, dataUrl) {
   if (typeof dataUrl !== 'string' || !/^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(dataUrl)) {
     throw new TypeError('persistent-image-data-invalid');
   }
-  const path = imageRelativePath(id);
-  await storage.plugin.writeText({ path, content: dataUrl });
-  const verified = await storage.plugin.readText({ path });
-  if (!verified?.found || verified.content !== dataUrl) throw new Error('persistent-image-verification-failed:' + id);
-  return path;
+  imageRelativePath(id);
+  await storage.plugin.writeImage({ id: String(id), dataUrl });
+  const verified = await storage.plugin.readImage({ id: String(id) });
+  if (!verified?.found || verified.dataUrl !== dataUrl) throw new Error('persistent-image-verification-failed:' + id);
+  return 'Images/' + String(id);
 }
 
 export async function readPersistentImage(storage, id) {
