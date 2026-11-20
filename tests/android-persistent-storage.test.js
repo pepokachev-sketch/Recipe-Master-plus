@@ -46,10 +46,10 @@ test('writes and verifies portable image files through the native bridge', async
   assert.equal(await readPersistentImage(storage, 'img-1'), dataUrl);
 });
 
-test('rejects corrupt or unavailable persistent image files', async () => {
+test('rejects corrupt images and safely handles unavailable persistent storage', async () => {
   const storage = { granted: true, plugin: { readImage: async () => ({ found: true, dataUrl: 'not-an-image' }) } };
   await assert.rejects(readPersistentImage(storage, 'img-2'), /persistent-image-file-invalid/);
-  await assert.rejects(readPersistentImage({ granted: false }, 'img-2'), /persistent-storage-not-granted/);
+  assert.equal(await readPersistentImage({ granted: false }, 'img-2'), null);
 });
 
 test('commits a validated full state through the native SQLite bridge', async () => {
