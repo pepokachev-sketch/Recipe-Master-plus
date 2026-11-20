@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/android-backup-existing-directory-2026-11-18
+      - feature/android-hybrid-storage-v8
   pull_request:
     branches:
       - feature/android-capacitor
@@ -68,7 +69,7 @@ jobs:
       - name: Generate Android project
         run: npx cap add android
 
-      - name: Set APK version to v7
+      - name: Set APK version to v8
         run: |
           python3 - <<'PY'
           import re
@@ -76,15 +77,28 @@ jobs:
           path = Path("android/app/build.gradle")
           content = path.read_text()
           content, code_count = re.subn(r"(?m)^(\s*versionCode\s+)\d+", r"\g<1>7", content, count=1)
-          content, name_count = re.subn(r"""(?m)^(\s*versionName\s+)(["']).*?\2""", r'\g<1>"7"', content, count=1)
+          content, name_count = re.subn(r"""(?m)^(\s*versionName\s+)(["']).*?\2""", r'\g<1>"8"', content, count=1)
           if code_count != 1 or name_count != 1:
-              raise SystemExit("Could not safely set Android versionCode/versionName to 7")
+              raise SystemExit("Could not safely set Android versionCode/versionName to 8")
           path.write_text(content)
-          print("Configured versionCode=7 and versionName=7")
+          print("Configured versionCode=7 and versionName=8")
           PY
+
+      - name: Install Recipe Master Plus launcher icon
+        run: |
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p "android/app/src/main/res/mipmap-$density"
+            cp android-icons/ic_launcher.png "android/app/src/main/res/mipmap-$density/ic_launcher.png"
+            cp android-icons/ic_launcher.png "android/app/src/main/res/mipmap-$density/ic_launcher_round.png"
+          done
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
 
       - name: Sync Capacitor plugins and assets
         run: npx cap sync android
+
+      - name: Install persistent SQLite and public-files storage
+        run: node scripts/install-android-persistent-storage.mjs
 
       - name: Build debug APK
         working-directory: android
@@ -93,7 +107,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: recipe-master-plus-v7-debug-apk
+          name: recipe-master-plus-v8-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
