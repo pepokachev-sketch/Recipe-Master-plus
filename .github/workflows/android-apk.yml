@@ -88,8 +88,8 @@ jobs:
         run: |
           sed -i -E 's/^[[:space:]]*versionCode[[:space:]]+[0-9]+[[:space:]]*$/        versionCode 8/' android/app/build.gradle
           sed -i -E 's/^[[:space:]]*versionName[[:space:]]+"[^"]+"[[:space:]]*$/        versionName "8"/' android/app/build.gradle
-          grep -q 'versionCode 7' android/app/build.gradle
-          grep -q 'versionName "7"' android/app/build.gradle
+          grep -q 'versionCode 8' android/app/build.gradle
+          grep -q 'versionName "8"' android/app/build.gradle
 
       - name: Build debug APK
         working-directory: android
