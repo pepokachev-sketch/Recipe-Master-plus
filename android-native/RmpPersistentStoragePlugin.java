@@ -21,6 +21,7 @@ import com.getcapacitor.PermissionState;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -107,7 +108,7 @@ public class RmpPersistentStoragePlugin extends Plugin {
         call.resolve(permissionResult());
     }
 
-    @ActivityCallback
+    @PermissionCallback
     private void handleLegacyPermissionResult(PluginCall call) {
         if (call == null) return;
         call.resolve(permissionResult());
