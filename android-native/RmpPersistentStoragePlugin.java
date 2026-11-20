@@ -141,11 +141,37 @@ public class RmpPersistentStoragePlugin extends Plugin {
         return target;
     }
 
-    private SQLiteDatabase openDatabase() throws IOException {
+    private File databaseFile() throws IOException {
         File root = ensureRoot();
-        File databaseDirectory = new File(root, "Database");
-        File file = new File(databaseDirectory, DB_NAME);
+        return new File(new File(root, "Database"), DB_NAME);
+    }
+
+    private void copyFileAtomic(File source, File destination) throws IOException {
+        File temporary = new File(destination.getParentFile(), destination.getName() + ".tmp");
+        try (FileInputStream input = new FileInputStream(source);
+             FileOutputStream output = new FileOutputStream(temporary)) {
+            byte[] buffer = new byte[65536];
+            int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            output.flush();
+            output.getFD().sync();
+        }
+        File previous = new File(destination.getParentFile(), destination.getName() + ".bak");
+        if (previous.exists() && !previous.delete()) throw new IOException("cannot-clear-backup-staging-file");
+        boolean hadDestination = destination.exists();
+        if (hadDestination && !destination.renameTo(previous)) throw new IOException("cannot-stage-previous-backup");
+        if (!temporary.renameTo(destination)) {
+            if (hadDestination) previous.renameTo(destination);
+            temporary.delete();
+            throw new IOException("backup-atomic-rename-failed");
+        }
+        if (hadDestination) previous.delete();
+    }
+
+    private SQLiteDatabase openDatabase() throws IOException {
+        File file = databaseFile();
         SQLiteDatabase db = SQLiteDatabase.openOrCreateDatabase(file, null);
+        db.execSQL("PRAGMA synchronous=FULL");
         db.execSQL("CREATE TABLE IF NOT EXISTS app_state (collection TEXT PRIMARY KEY NOT NULL, payload TEXT NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)");
         return db;
@@ -184,6 +210,87 @@ public class RmpPersistentStoragePlugin extends Plugin {
             call.reject("persistent-database-read-failed: " + error.getMessage(), error);
         } finally {
             if (cursor != null) cursor.close();
+            if (db != null) db.close();
+        }
+    }
+
+    @PluginMethod
+    public void saveState(PluginCall call) {
+        SQLiteDatabase db = null;
+        long revision = 1;
+        try {
+            String[] payloads = new String[COLLECTIONS.length];
+            for (int i = 0; i < COLLECTIONS.length; i++) {
+                JSArray value = call.getArray(COLLECTIONS[i]);
+                if (value == null) throw new IllegalArgumentException("missing-collection:" + COLLECTIONS[i]);
+                JSONArray checked = new JSONArray(value.toString());
+                payloads[i] = checked.toString();
+            }
+
+            db = openDatabase();
+            db.beginTransaction();
+            try {
+                SQLiteStatement statement = db.compileStatement(
+                    "INSERT OR REPLACE INTO app_state(collection, payload) VALUES(?, ?)"
+                );
+                for (int i = 0; i < COLLECTIONS.length; i++) {
+                    statement.clearBindings();
+                    statement.bindString(1, COLLECTIONS[i]);
+                    statement.bindString(2, payloads[i]);
+                    statement.executeInsert();
+                }
+                statement.close();
+
+                Cursor cursor = db.rawQuery("SELECT value FROM metadata WHERE key = 'revision'", null);
+                if (cursor.moveToFirst()) {
+                    try { revision = Long.parseLong(cursor.getString(0)) + 1; }
+                    catch (NumberFormatException ignored) { revision = 1; }
+                }
+                cursor.close();
+                db.execSQL("INSERT OR REPLACE INTO metadata(key, value) VALUES('revision', ?)", new Object[]{String.valueOf(revision)});
+                db.execSQL("INSERT OR REPLACE INTO metadata(key, value) VALUES('updatedAt', ?)", new Object[]{String.valueOf(System.currentTimeMillis())});
+                db.setTransactionSuccessful();
+            } finally {
+                db.endTransaction();
+            }
+            db.close();
+            db = null;
+
+            boolean backupWritten = false;
+            // Refresh the recovery copy on the first save and then at most every five minutes.
+            try {
+                File root = ensureRoot();
+                File backupFile = new File(new File(root, "Backups"), "recipe-master-plus-recovery.db");
+                long lastBackup = 0;
+                SQLiteDatabase checkDb = SQLiteDatabase.openDatabase(databaseFile().getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
+                Cursor backupCursor = checkDb.rawQuery("SELECT value FROM metadata WHERE key = 'backupAt'", null);
+                if (backupCursor.moveToFirst()) {
+                    try { lastBackup = Long.parseLong(backupCursor.getString(0)); }
+                    catch (NumberFormatException ignored) { lastBackup = 0; }
+                }
+                backupCursor.close();
+                checkDb.close();
+                if (!backupFile.exists() || System.currentTimeMillis() - lastBackup >= 300000L) {
+                    copyFileAtomic(databaseFile(), backupFile);
+                    SQLiteDatabase markDb = SQLiteDatabase.openDatabase(databaseFile().getAbsolutePath(), null, SQLiteDatabase.OPEN_READWRITE);
+                    markDb.execSQL("INSERT OR REPLACE INTO metadata(key, value) VALUES('backupAt', ?)", new Object[]{String.valueOf(System.currentTimeMillis())});
+                    markDb.close();
+                    backupWritten = true;
+                } else {
+                    backupWritten = true;
+                }
+            } catch (Exception backupError) {
+                android.util.Log.w("RmpPersistentStorage", "Recovery database copy could not be refreshed", backupError);
+            }
+
+            JSObject result = new JSObject();
+            result.put("saved", true);
+            result.put("revision", revision);
+            result.put("backupWritten", backupWritten);
+            call.resolve(result);
+        } catch (Exception error) {
+            call.reject("persistent-database-write-failed: " + error.getMessage(), error);
+        } finally {
             if (db != null) db.close();
         }
     }
