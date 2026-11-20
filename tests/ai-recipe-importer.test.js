@@ -17,7 +17,8 @@ test('validates and normalizes a recipe package', () => {
   assert.equal(result.ingredients.length, 2);
   assert.equal(result.steps, 'Подготви продуктите.\nСвари супата.');
   assert.equal(result.servings, '4');
-  assert.equal(result.ingredients[0].scale, false);\n  assert.equal(result.ingredients[0].excludeBaseScaling, true);
+  assert.equal(result.ingredients[0].scale, false);
+  assert.equal(result.ingredients[0].excludeBaseScaling, true);
 });
 
 test('rejects unsupported schema and missing recipe name', () => {
