@@ -211,7 +211,7 @@ public class RmpPersistentStoragePlugin extends Plugin {
             db.close();
             db = null;
 
-            if (!result.getBool("found", false)) {
+            if (!Boolean.TRUE.equals(result.getBool("found"))) {
                 File root = ensureRoot();
                 File backup = new File(new File(root, "Backups"), "recipe-master-plus-recovery.db");
                 if (backup.isFile()) {
@@ -219,7 +219,7 @@ public class RmpPersistentStoragePlugin extends Plugin {
                     JSObject backupState;
                     try { backupState = readStateFromDatabase(backupDb); }
                     finally { backupDb.close(); }
-                    if (backupState.getBool("found", false)) {
+                    if (Boolean.TRUE.equals(backupState.getBool("found"))) {
                         copyFileAtomic(backup, databaseFile());
                         backupState.put("recoveredFromBackup", true);
                         call.resolve(backupState);
