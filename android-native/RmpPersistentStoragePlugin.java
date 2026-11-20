@@ -343,6 +343,14 @@ public class RmpPersistentStoragePlugin extends Plugin {
         }
     }
 
+    private String imageExtension(String mimeType) {
+        if ("image/jpeg".equals(mimeType)) return "jpg";
+        if ("image/png".equals(mimeType)) return "png";
+        if ("image/webp".equals(mimeType)) return "webp";
+        if ("image/gif".equals(mimeType)) return "gif";
+        throw new IllegalArgumentException("unsupported-image-mime-type");
+    }
+
     @PluginMethod
     public void writeImage(PluginCall call) {
         try {
