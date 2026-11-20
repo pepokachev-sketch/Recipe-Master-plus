@@ -42,3 +42,28 @@ test('does not mutate the incoming package', () => {
   validateRecipePackage(input);
   assert.deepEqual(input, valid);
 });
+
+
+test('preserves imported quantities and disables automatic portion scaling', () => {
+  const input = {
+    ...valid,
+    recipe: {
+      ...valid.recipe,
+      servings: 10,
+      ingredients: [
+        { amount: '1250', unit: 'г', name: 'свинско месо', scale: true, base: true, scaleBase: true },
+        { amount: '37,5', unit: 'г', name: 'сол', scale: true, scaleBase: true },
+        { amount: 'на вкус', unit: '', name: 'черен пипер' }
+      ]
+    }
+  };
+  const result = validateRecipePackage(input);
+  assert.equal(result.servings, '10');
+  assert.deepEqual(result.ingredients.map(row => row.amount), ['1250', '37,5', 'на вкус']);
+  for (const row of result.ingredients) {
+    assert.equal(row.scale, false);
+    assert.equal(row.base, false);
+    assert.equal(row.excludeBaseScaling, true);
+    assert.equal(row.scaleBase, false);
+  }
+});
