@@ -775,12 +775,57 @@ dialog#detailDialog #wakeLockToggle[aria-pressed="true"]::after{
   <button class="btn" id="expandedEditSave" type="button">Запази текста</button>
  </div>
 </dialog>
-<script>
+<script type="module">
+import { getPersistentStoragePlugin, preparePersistentStorage } from './src/android-persistent-storage.js';
+
+(async () => {
+  try {
+    const nativePlugin = getPersistentStoragePlugin();
+    if (nativePlugin) {
+      try {
+        const permission = await nativePlugin.checkAccess();
+        if (!permission?.granted) {
+          alert('Recipe Master Plus трябва да съхранява базата и снимките в общата памет на телефона, за да останат след деинсталиране. Следващият екран е настройката „Allow access to manage all files“. Без това разрешение приложението ще продължи да работи, но няма да може да възстанови автоматично данните след деинсталиране.');
+        }
+      } catch (permissionCheckError) {
+        console.warn('Recipe Master Plus: storage permission pre-check failed', permissionCheckError);
+      }
+    }
+    const storage = await preparePersistentStorage(nativePlugin);
+    window.__RMP_PERSISTENT_STORAGE__ = storage;
+    window.__RMP_BOOT_STATE__ = storage.state;
+    if (storage.supported && !storage.granted) {
+      window.__RMP_STORAGE_PERMISSION_MISSING__ = true;
+    }
+  } catch (error) {
+    console.error('Recipe Master Plus: persistent database could not be opened safely', error);
+    document.body.innerHTML = '<main style="max-width:680px;margin:10vh auto;padding:24px;color:#f4f4f5;background:#1a1a1d;border-radius:18px;font:16px system-ui"><h2 style="color:#ff7900">Не успях да отворя постоянната база данни</h2><p>Данните не са изтрити и приложението няма да започне с празен рецептурник, за да не презапише съществуващата информация.</p><p>Провери разрешението за достъп до файловете и опитай да стартираш приложението отново. Ако проблемът остане, не изтривай папката Recipe Master Plus.</p><p style="opacity:.7;font-size:12px;overflow-wrap:anywhere"></p></main>';
+    document.body.querySelector('p:last-child').textContent = String(error);
+    return;
+  }
+
+  if (window.__RMP_STORAGE_PERMISSION_MISSING__) {
+    alert('Recipe Master Plus няма разрешение за достъп до постоянната папка в телефона. Приложението ще се отвори, но новите промени няма да бъдат защитени от деинсталиране. Разреши „Manage all files“ от настройките и отвори приложението отново.');
+  }
+
+  const source = document.getElementById('rmp-app-source');
+  if (!source) throw new Error('Recipe Master Plus application script was not found');
+  const app = document.createElement('script');
+  app.textContent = source.textContent;
+  document.body.appendChild(app);
+})();
+</script>
+<script type="text/plain" id="rmp-app-source">
 let categories=['Супи и чорби','Месни ястия','Ястия на фурна','Салати и предястия','Десерти','Зимнина и консервиране','Домашни колбаси и мезета','Сосове и маринати','Тестени изделия','Рецепти от механи и ресторанти','Други'];
 const $=id=>document.getElementById(id);
 const rmpLoadBackupAdapter=()=>import('./src/backup-image-adapter.js');
 const storageReadErrors=[];
 const read=(key,fallback)=>{
+ const bootState=window.__RMP_BOOT_STATE__;
+ const bootCollection=({myrecipes_v1:'recipes',mymeat_v1:'meatNotes',myshop_v1:'shopping',myrecipes_customcats_v1:'customCategories'})[key];
+ if(bootState&&bootCollection&&Object.prototype.hasOwnProperty.call(bootState,bootCollection)){
+  return JSON.parse(JSON.stringify(bootState[bootCollection]));
+ }
  let raw=null;
  try{
   raw=localStorage.getItem(key);
@@ -805,6 +850,73 @@ if(!history.state?.rmpView)history.replaceState({rmpView:'home'},'',location.hre
 
 const cloneState=value=>JSON.parse(JSON.stringify(value));
 let lastCommittedState={recipes:cloneState(recipes),meatNotes:cloneState(meatNotes),shopping:cloneState(shopping),customCategories:cloneState(customCategories),categories:[...categories]};
+const rmpPersistentStorage=window.__RMP_PERSISTENT_STORAGE__||null;
+let rmpNativeCommitQueue=Promise.resolve();
+let rmpNativeCommitSequence=0;
+function rmpNativeFullStateSnapshot(){
+ return {
+  recipes:cloneState(recipes),
+  meatNotes:cloneState(meatNotes),
+  shopping:cloneState(shopping),
+  customCategories:cloneState(customCategories)
+ };
+}
+function rmpNativeStateSnapshot(){
+ const state=rmpNativeFullStateSnapshot();
+ state.recipes=state.recipes.filter(r=>!r.librarySource);
+ return state;
+}
+function rmpQueueNativeStateSave(snapshot,fullSnapshot){
+ const sequence=++rmpNativeCommitSequence;
+ const operation=rmpNativeCommitQueue.then(()=>rmpPersistentStorage.plugin.saveState(snapshot));
+ rmpNativeCommitQueue=operation.then(result=>{
+  lastCommittedState={recipes:cloneState(fullSnapshot.recipes),meatNotes:cloneState(fullSnapshot.meatNotes),shopping:cloneState(fullSnapshot.shopping),customCategories:cloneState(fullSnapshot.customCategories),categories:[...categories]};
+  if(result?.backupWritten===false)console.warn('Recipe Master Plus: SQLite state saved, but the recovery database copy could not be refreshed.');
+  return result;
+ }).catch(error=>{
+  console.error('Recipe Master Plus: постоянната SQLite база не прие промените',error);
+  if(sequence===rmpNativeCommitSequence){
+   recipes=cloneState(lastCommittedState.recipes);
+   meatNotes=cloneState(lastCommittedState.meatNotes);
+   shopping=cloneState(lastCommittedState.shopping);
+   customCategories=cloneState(lastCommittedState.customCategories);
+   categories=[...lastCommittedState.categories];
+   if(activeRecipe)activeRecipe=recipes.find(r=>r.id===activeRecipe.id)||null;
+   try{if($('recipeCount'))renderRecipes();if($('meatList'))renderMeat();if($('shopList'))renderShop();if($('customCategoryList'))renderCustomCategoryList();if(activeRecipe&&$('detailDialog')?.open)renderRecipeDetail()}catch(renderError){console.error('Recipe Master Plus: rollback render failed',renderError)}
+   alert('Не успях да запазя промените в постоянната база данни на телефона. Върнах последното успешно записано състояние. Не деинсталирай приложението, докато проблемът не бъде отстранен.');
+  }
+  return {saved:false,error};
+ });
+ return true;
+}
+async function rmpWritePersistentImage(id,dataUrl){
+ if(!rmpPersistentStorage?.granted||!rmpPersistentStorage.plugin)return false;
+ if(!/^[A-Za-z0-9._:-]{1,100}$/.test(String(id)))throw new Error('persistent-image-id-invalid');
+ await rmpPersistentStorage.plugin.writeImage({id,dataUrl});
+ const verified=await rmpPersistentStorage.plugin.readImage({id});
+ if(!verified?.found||verified.dataUrl!==dataUrl)throw new Error('persistent-image-verification-failed:'+id);
+ return true;
+}
+async function rmpReadPersistentImage(id){
+ if(!rmpPersistentStorage?.granted||!rmpPersistentStorage.plugin)return null;
+ const result=await rmpPersistentStorage.plugin.readImage({id});
+ if(!result?.found||typeof result.dataUrl!=='string')return null;
+ if(!/^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(result.dataUrl))throw new Error('persistent-image-file-invalid:'+id);
+ return result.dataUrl;
+}
+async function rmpInitializeNativeStorage(){
+ if(!rmpPersistentStorage?.granted||!rmpPersistentStorage.plugin||rmpPersistentStorage.active)return false;
+ if(storageReadErrors.length)throw new Error('legacy-storage-invalid; refusing automatic migration');
+ const fullSnapshot=rmpNativeFullStateSnapshot();
+ const snapshot={...fullSnapshot,recipes:fullSnapshot.recipes.filter(r=>!r.librarySource)};
+ const result=await rmpPersistentStorage.plugin.saveState(snapshot);
+ if(!result?.saved)throw new Error('initial-sqlite-migration-not-confirmed');
+ rmpPersistentStorage.active=true;
+ lastCommittedState={recipes:cloneState(fullSnapshot.recipes),meatNotes:cloneState(fullSnapshot.meatNotes),shopping:cloneState(fullSnapshot.shopping),customCategories:cloneState(fullSnapshot.customCategories),categories:[...categories]};
+ if(result?.backupWritten===false)console.warn('Recipe Master Plus: SQLite migration succeeded, but the recovery database copy could not be created.');
+ console.info('Recipe Master Plus: legacy data migrated to public SQLite database',result.revision);
+ return true;
+}
 function persist(){
  if(storageReadErrors.length){
   const keys=storageReadErrors.map(item=>item.key).join(', ');
@@ -823,6 +935,9 @@ function persist(){
   }catch(renderError){console.error('Recipe Master Plus: грешка при възстановяване след блокиран запис',renderError)}
   alert('Открити са повредени или недостъпни локални данни ('+keys+'). Записването е блокирано, за да не бъдат презаписани. Промените в текущата операция са отменени и приложението е върнато към последното успешно запазено състояние. Не изчиствай данните на браузъра. Възстанови ги от резервно копие или потърси помощ за възстановяване.');
   return false;
+ }
+ if(rmpPersistentStorage?.active){
+  return rmpQueueNativeStateSave(rmpNativeStateSnapshot(),rmpNativeFullStateSnapshot());
  }
  const keys=['myrecipes_v1','mymeat_v1','myshop_v1','myrecipes_customcats_v1'];
  let previous=null;
@@ -906,12 +1021,14 @@ async function rmpImagePut(id,dataUrl){
  const url=URL.createObjectURL(check.blob);
  const previous=rmpImageUrls.get(id);if(previous)URL.revokeObjectURL(previous);
  rmpImageUrls.set(id,url);
+ if(rmpPersistentStorage?.granted)await rmpWritePersistentImage(id,dataUrl);
  return 'idb:'+id;
 }
 async function rmpImageGet(id){
- const record=await rmpImageRecordGet(id);if(!record)return null;
+ const record=await rmpImageRecordGet(id);
+ if(!record)return await rmpReadPersistentImage(id);
  if(typeof record.dataUrl==='string')return record.dataUrl;
- if(!(record.blob instanceof Blob))return null;
+ if(!(record.blob instanceof Blob))return await rmpReadPersistentImage(id);
  return await new Promise((resolve,reject)=>{
   const reader=new FileReader();reader.onload=()=>resolve(typeof reader.result==='string'?reader.result:null);
   reader.onerror=()=>reject(reader.error||new Error('image-read-failed'));reader.readAsDataURL(record.blob);
@@ -919,12 +1036,23 @@ async function rmpImageGet(id){
 }
 async function rmpResolveImage(id){
  if(rmpImageUrls.has(id))return rmpImageUrls.get(id);
- const record=await rmpImageRecordGet(id);if(!record)return '';
+ const record=await rmpImageRecordGet(id);
+ if(!record){
+  const externalData=await rmpReadPersistentImage(id);if(!externalData)return '';
+  const externalBlob=await (await fetch(externalData)).blob();
+  if(!externalBlob.size)return '';
+  const externalUrl=URL.createObjectURL(externalBlob);rmpImageUrls.set(id,externalUrl);return externalUrl;
+ }
  let blob=record.blob;
  // Backward compatibility: older versions stored Base64 data URLs in IndexedDB.
  if(!(blob instanceof Blob)&&typeof record.dataUrl==='string')blob=await (await fetch(record.dataUrl)).blob();
  if(!(blob instanceof Blob)||!blob.size)return '';
- const url=URL.createObjectURL(blob);rmpImageUrls.set(id,url);return url;
+ const url=URL.createObjectURL(blob);rmpImageUrls.set(id,url);
+ if(rmpPersistentStorage?.granted){
+  const dataUrl=await rmpImageGet(id);
+  if(dataUrl)await rmpWritePersistentImage(id,dataUrl);
+ }
+ return url;
 }
 function rmpNewImageId(){
  return 'img-'+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
@@ -1440,7 +1568,14 @@ async function saveJsonBackup(filename,jsonText){
    const Filesystem=window.Capacitor?.Plugins?.Filesystem;
    if(!Filesystem||typeof Filesystem.writeFile!=='function')throw new Error('filesystem-plugin-unavailable');
    const relativePath=BACKUP_DIRECTORY+'/'+filename;
-   await Filesystem.mkdir({path:BACKUP_DIRECTORY,directory:'DOCUMENTS',recursive:true});
+   try{
+    await Filesystem.mkdir({path:BACKUP_DIRECTORY,directory:'DOCUMENTS',recursive:true});
+   }catch(mkdirError){
+    // Android SAF may report that the directory already exists even with recursive:true.
+    // Reuse it only after stat confirms that the existing path is a directory.
+    const existingDirectory=await Filesystem.stat({path:BACKUP_DIRECTORY,directory:'DOCUMENTS'});
+    if(!existingDirectory||existingDirectory.type!=='directory')throw mkdirError;
+   }
    const saved=await Filesystem.writeFile({path:relativePath,data:jsonText,directory:'DOCUMENTS',encoding:'utf8',recursive:true});
    if(!saved?.uri)throw new Error('filesystem-uri-missing');
    const info=await Filesystem.stat({path:relativePath,directory:'DOCUMENTS'});
@@ -1650,8 +1785,14 @@ async function syncCentralRecipeLibrary(){
  }catch(error){console.warn('Recipe Master Plus: централната библиотека не е достъпна; приложението продължава с локалните рецепти и кеша на браузъра.',error)}
 }
 (async()=>{
- try{await rmpHydrateImages();console.info('Recipe Master Plus: изображенията са заредени от IndexedDB.')}
- catch(error){console.error('Recipe Master Plus: миграцията/зареждането на изображенията не завърши',error);alert('Част от снимките не бяха преместени в IndexedDB. Оригиналните данни са запазени. Приложението ще се отвори с наличните локални снимки.')}
+ let imageHydrationSucceeded=false;
+ try{await rmpHydrateImages();imageHydrationSucceeded=true;console.info('Recipe Master Plus: изображенията са заредени от локалното и постоянното хранилище.')}
+ catch(error){console.error('Recipe Master Plus: миграцията/зареждането на изображенията не завърши',error);alert('Част от снимките не бяха прехвърлени. Оригиналните данни са запазени. Не деинсталирай приложението, докато не проверим снимките.')}
+ if(imageHydrationSucceeded){
+  try{await rmpInitializeNativeStorage();}
+  catch(error){console.error('Recipe Master Plus: първоначалното прехвърляне към SQLite не завърши',error);alert('Не успях да завърша миграцията към постоянната база на телефона. Старите данни не са изтрити. Не деинсталирай приложението и направи резервно копие.')}
+ }
+ if(rmpPersistentStorage?.granted&&!rmpPersistentStorage.active)console.warn('Recipe Master Plus: persistent SQLite is not active; using legacy browser storage.');
  await syncCentralRecipeLibrary();
  renderRecipes();renderCustomCategoryList();renderMeat();renderShop();
 })();

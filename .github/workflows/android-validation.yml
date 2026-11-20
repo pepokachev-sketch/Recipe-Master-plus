@@ -1,0 +1,43 @@
+name: Recipe Master Plus Android validation
+
+on:
+  push:
+    branches:
+      - feature/android-hybrid-storage-v8
+  pull_request:
+    branches:
+      - feature/android-capacitor
+    paths:
+      - 'index.html'
+      - 'package.json'
+      - 'capacitor.config.json'
+      - 'scripts/**'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rmp-android-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run data, backup and importer tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install project dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run automated tests
+        run: npm run test:data-manager

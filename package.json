@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:data-manager": "node --test tests/indexeddb-data-manager.test.js tests/backup-image-adapter.test.js tests/backup-integration-smoke.test.js tests/ai-recipe-importer.test.js",
+    "test:data-manager": "node --test tests/indexeddb-data-manager.test.js tests/backup-image-adapter.test.js tests/backup-integration-smoke.test.js tests/ai-recipe-importer.test.js tests/android-persistent-storage.test.js",
     "android:prepare-web": "node scripts/prepare-android-web.mjs",
     "android:add": "cap add android",
     "android:sync": "cap sync android"

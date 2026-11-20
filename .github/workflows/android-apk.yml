@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - feature/android-capacitor
+      - feature/android-hybrid-storage-v7
+      - feature/android-hybrid-storage-v8
     paths:
       - 'index.html'
       - 'manifest.webmanifest'
@@ -16,6 +18,8 @@ on:
       - 'package.json'
       - 'capacitor.config.json'
       - 'scripts/prepare-android-web.mjs'
+      - 'scripts/install-android-persistent-storage.mjs'
+      - 'android-native/**'
       - 'tests/**'
       - '.github/workflows/android-apk.yml'
 
@@ -77,24 +81,27 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Set APK version 6
+      - name: Install persistent SQLite and public-files storage
+        run: node scripts/install-android-persistent-storage.mjs
+
+      - name: Set APK version 8
         run: |
-          sed -i -E 's/^[[:space:]]*versionCode[[:space:]]+[0-9]+[[:space:]]*$/        versionCode 6/' android/app/build.gradle
-          sed -i -E 's/^[[:space:]]*versionName[[:space:]]+"[^"]+"[[:space:]]*$/        versionName "6"/' android/app/build.gradle
-          grep -q 'versionCode 6' android/app/build.gradle
-          grep -q 'versionName "6"' android/app/build.gradle
+          sed -i -E 's/^[[:space:]]*versionCode[[:space:]]+[0-9]+[[:space:]]*$/        versionCode 8/' android/app/build.gradle
+          sed -i -E 's/^[[:space:]]*versionName[[:space:]]+"[^"]+"[[:space:]]*$/        versionName "8"/' android/app/build.gradle
+          grep -q 'versionCode 8' android/app/build.gradle
+          grep -q 'versionName "8"' android/app/build.gradle
 
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug
 
-      - name: Name version 6 APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Recipe-Master-Plus-v6.apk
+      - name: Name version 8 APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Recipe-Master-Plus-v8.apk
 
-      - name: Upload version 6 APK
+      - name: Upload version 8 APK
         uses: actions/upload-artifact@v4
         with:
-          name: recipe-master-plus-v6-apk
-          path: android/app/build/outputs/apk/debug/Recipe-Master-Plus-v6.apk
+          name: recipe-master-plus-v8-apk
+          path: android/app/build/outputs/apk/debug/Recipe-Master-Plus-v8.apk
           if-no-files-found: error
           retention-days: 14
