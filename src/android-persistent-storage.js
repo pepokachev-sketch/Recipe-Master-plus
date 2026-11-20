@@ -50,9 +50,21 @@ export function imageRelativePath(id) {
 
 export async function preparePersistentStorage(plugin = getPersistentStoragePlugin(), options = {}) {
   if (!plugin) return { supported: false, granted: false, active: false, plugin: null, state: null };
-  let permission = await plugin.checkAccess();
-  if (!permission?.granted && options.requestPermission !== false) {
-    permission = await plugin.requestAccess();
+  let permission;
+  try {
+    permission = await plugin.checkAccess();
+    if (!permission?.granted && options.requestPermission !== false) {
+      permission = await plugin.requestAccess();
+    }
+  } catch (error) {
+    return {
+      supported: true,
+      granted: false,
+      active: false,
+      plugin,
+      state: null,
+      permissionError: String(error)
+    };
   }
   if (!permission?.granted) {
     return { supported: true, granted: false, active: false, plugin, state: null, rootPath: permission?.rootPath || null };
