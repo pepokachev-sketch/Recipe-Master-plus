@@ -6,8 +6,16 @@ const KEY_TO_COLLECTION = Object.freeze({
   myrecipes_customcats_v1: 'customCategories'
 });
 
+let cachedNativePlugin = null;
 export function getPersistentStoragePlugin() {
-  return globalThis.Capacitor?.Plugins?.RmpPersistentStorage || null;
+  if (cachedNativePlugin) return cachedNativePlugin;
+  const capacitor = globalThis.Capacitor;
+  if (typeof capacitor?.registerPlugin === 'function') {
+    cachedNativePlugin = capacitor.registerPlugin('RmpPersistentStorage');
+    return cachedNativePlugin;
+  }
+  cachedNativePlugin = capacitor?.Plugins?.RmpPersistentStorage || null;
+  return cachedNativePlugin;
 }
 
 export function validatePersistentState(value) {
