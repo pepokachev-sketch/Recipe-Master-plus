@@ -889,7 +889,7 @@ async function rmpReadPersistentImage(id){
  if(!rmpPersistentStorage?.granted||!rmpPersistentStorage.plugin)return null;
  const result=await rmpPersistentStorage.plugin.readText({path:'Images/'+id+'.txt'});
  if(!result?.found||typeof result.content!=='string')return null;
- if(!/^data:image\\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(result.content))throw new Error('persistent-image-file-invalid:'+id);
+ if(!/^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(result.content))throw new Error('persistent-image-file-invalid:'+id);
  return result.content;
 }
 async function rmpInitializeNativeStorage(){
